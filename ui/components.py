@@ -98,7 +98,7 @@ def render_header() -> None:
     _render_html(
         """
         <div class="app-header">
-            <h1>📊 Market Scanner</h1>
+            <h1>Market Scanner</h1>
             <p class="app-subtitle">AI-Powered Stock &amp; Options Research Engine</p>
             <p class="app-disclaimer">
                 Research tool only — not financial advice. Paper trade and verify all results.
@@ -231,7 +231,7 @@ def render_top5_upside_cards(df) -> None:
     df : pd.DataFrame
         Columns: ticker, last_price, bayesian_posterior, bull_pct_90, quality_score, reason.
     """
-    st.subheader("🚀 Top 5 Highest Upside (Bayesian Conviction)")
+    st.subheader("Top 5 Highest Upside (Bayesian Conviction)")
     st.markdown("<small style='color:#8892a0;'>Sorted by mathematically modeled 90-day upside and Bayesian probability. *Not a guarantee of future returns.*</small>", unsafe_allow_html=True)
     cols = st.columns(5)
     
@@ -349,10 +349,10 @@ def render_forecast_card(forecast: dict) -> None:
 
         card_html = f"""
         <div class="metric-card forecast-card" style="display:flex; flex-direction:column; gap:8px;">
-            <div class="horizon-title" style="margin-bottom:4px;">📅 {h}-Day Forecast</div>
+            <div class="horizon-title" style="margin-bottom:4px;">{h}-Day Forecast</div>
 
             <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
-                <span class="forecast-label text-red" style="min-width:60px;">🐻 Bear</span>
+                <span class="forecast-label text-red" style="min-width:60px;">Bear</span>
                 <span style="text-align:right;">
                     <span class="forecast-value">${bear:,.2f}</span>
                     <span class="forecast-delta text-red" style="margin-left:4px;">{_format_pct(bear_pct)}</span>
@@ -360,7 +360,7 @@ def render_forecast_card(forecast: dict) -> None:
             </div>
 
             <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
-                <span class="forecast-label text-yellow" style="min-width:60px;">📊 Base</span>
+                <span class="forecast-label text-yellow" style="min-width:60px;">Base</span>
                 <span style="text-align:right;">
                     <span class="forecast-value">${base:,.2f}</span>
                     <span class="forecast-delta text-yellow" style="margin-left:4px;">{_format_pct(base_pct)}</span>
@@ -368,7 +368,7 @@ def render_forecast_card(forecast: dict) -> None:
             </div>
 
             <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
-                <span class="forecast-label text-green" style="min-width:60px;">🐂 Bull</span>
+                <span class="forecast-label text-green" style="min-width:60px;">Bull</span>
                 <span style="text-align:right;">
                     <span class="forecast-value">${bull:,.2f}</span>
                     <span class="forecast-delta text-green" style="margin-left:4px;">{_format_pct(bull_pct)}</span>
@@ -465,7 +465,7 @@ def render_risk_warnings(warnings: list[str]) -> None:
     html_parts = []
     for w in warnings:
         html_parts.append(
-            f'<div class="risk-warning">⚠️ {_esc(w)}</div>'
+            f'<div class="risk-warning">Warning: {_esc(w)}</div>'
         )
 
     _render_html("\n".join(html_parts))
@@ -501,7 +501,7 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
 
     def row(cat: str, crit: str, val_key: str, pass_key: str, fmt: str = "{}") -> str:
         passed = screen_results.get(pass_key, False)
-        icon = "✅" if passed else "❌"
+        icon = "Pass" if passed else "Fail"
         row_class = "delta-positive" if passed else "delta-negative"
         val = screen_results.get(val_key)
         
@@ -618,7 +618,7 @@ def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results
 
     card_html = textwrap.dedent(f"""
         <div class="metric-card" style="margin-top: 1rem;">
-            <h3 style="margin-top:0;">🧠 Causal Discovery Insights</h3>
+            <h3 style="margin-top:0;">Causal Discovery Insights</h3>
             <ul class="reason-list" style="margin-bottom: 0;">
                 {insights_html}
             </ul>

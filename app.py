@@ -347,7 +347,7 @@ else:
     st.markdown("### Top Candidates")
     components.render_top5_upside_cards(df)
     st.markdown("---")
-    components.render_top5_cards(df, "🟢 Top 5 Bullish (Multi-Factor)")
+    components.render_top5_cards(df, "Top 5 Bullish (Multi-Factor)")
     st.markdown("---")
     
     # 3. Scan Results Table
@@ -380,7 +380,7 @@ else:
     st.markdown("---")
     
     # 4. Detail Security Report Drill-down
-    st.subheader("🔍 Detailed Security Report")
+    st.subheader("Detailed Security Report")
     
     selected_ticker = st.selectbox(
         "Select Ticker to Inspect",

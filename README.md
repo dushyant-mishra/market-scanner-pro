@@ -1,4 +1,4 @@
-# Market Scanner Pro 📈
+# Market Scanner Pro
 
 An advanced, institutional-grade stock market screening and analysis dashboard built with Python and Streamlit. 
 
@@ -9,7 +9,7 @@ Market Scanner Pro moves beyond standard technical indicators by fusing **Fideli
 
 ---
 
-## 🧠 Core Architecture
+## Core Architecture
 
 ### 1. The Bayesian-Causal Inference Engine
 Most screeners rely on subjective "guesswork" or basic momentum overlays. Market Scanner Pro uses **Bayes' Theorem** to calculate the mathematical probability of a massive upside breakout (e.g., +50% target).
@@ -37,7 +37,7 @@ Using `scipy` local extrema detection, the engine programmatically hunts for:
 
 ---
 
-## 📊 Dashboard Features
+## Dashboard Features
 
 ### The "Home Run" Dashboard
 *   **Top 5 Highest Upside (Bayesian Conviction)**: Instantly isolates the top 5 stocks in the entire scanned universe that possess a >0% algorithmic upside target backed by the highest Bayesian probability.
@@ -54,7 +54,7 @@ Click into any ticker to view a comprehensive teardown:
 
 ---
 
-## 🚀 Installation & Usage
+## Installation & Usage
 
 ### Prerequisites
 *   Python 3.10+
