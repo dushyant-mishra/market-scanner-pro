@@ -288,12 +288,7 @@ def create_price_chart(hist: pd.DataFrame, ticker: str) -> go.Figure:
     # ── Layout ───────────────────────────────────────────────────
     base = get_chart_layout()
     base.update(
-        title=dict(
-            text=f"{ticker} — Technical Analysis",
-            font=dict(size=16, color="#ffffff"),
-            x=0,
-            xanchor="left",
-        ),
+        margin=dict(l=48, r=24, t=24, b=32),
         height=800,
         xaxis_rangeslider_visible=False,
         legend=dict(
@@ -392,12 +387,7 @@ def create_forecast_chart(
 
     base = get_chart_layout()
     base.update(
-        title=dict(
-            text=f"{ticker} — Price Forecast",
-            font=dict(size=16, color="#ffffff"),
-            x=0,
-            xanchor="left",
-        ),
+        margin=dict(l=48, r=24, t=24, b=32),
         height=400,
         yaxis_title="Price ($)",
         showlegend=True,
@@ -465,14 +455,8 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
 
     base = get_chart_layout()
     base.update(
-        title=dict(
-            text="Sector Heatmap — Bull Score",
-            font=dict(size=16, color="#ffffff"),
-            x=0,
-            xanchor="left",
-        ),
         height=500,
-        margin=dict(l=8, r=8, t=48, b=8),
+        margin=dict(l=8, r=8, t=24, b=8),
     )
     fig.update_layout(**base)
 
@@ -538,12 +522,7 @@ def create_strategy_radar(strategies: list[dict]) -> go.Figure:
 
     base = get_chart_layout()
     base.update(
-        title=dict(
-            text="Strategy Fit Analysis",
-            font=dict(size=16, color="#ffffff"),
-            x=0,
-            xanchor="left",
-        ),
+        margin=dict(l=24, r=24, t=24, b=24),
         height=450,
         polar=dict(
             bgcolor=COLORS["bg_primary"],

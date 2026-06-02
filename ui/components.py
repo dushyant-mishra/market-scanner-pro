@@ -249,7 +249,7 @@ def render_top5_upside_cards(df) -> None:
         bayesian_cls = _score_badge_class(bayesian * 100)
 
         card = f"""
-        <div class="metric-card top5-card {extra_cls}">
+        <div class="metric-card top5-card {extra_cls}" style="word-break: break-word; white-space: normal;">
             <div class="ticker-name">{_esc(row.get("ticker", ""))}</div>
             <div class="value" style="font-size:1.3rem;">${price:,.2f}</div>
             <div class="score-row">
@@ -282,14 +282,14 @@ def render_strategy_table(strategies: list[dict]) -> None:
     """
     header = textwrap.dedent(
         """\
-        <div class="table-container">
-        <table class="strategy-table">
+        <div class="table-container" style="overflow-x: auto;">
+        <table class="strategy-table" style="width: 100%; min-width: 600px;">
             <thead>
                 <tr>
                     <th style="width: 10%;">Rank</th>
                     <th style="width: 30%;">Strategy</th>
                     <th style="width: 15%;">Score</th>
-                    <th style="width: 45%;">Risk Warning</th>
+                    <th style="width: 45%; min-width: 250px;">Risk Warning</th>
                 </tr>
             </thead>
             <tbody>
@@ -308,7 +308,7 @@ def render_strategy_table(strategies: list[dict]) -> None:
                 <td style="font-weight:700;">{rank}</td>
                 <td>{_esc(s.get("name", ""))}</td>
                 <td style="color:{score_color}; font-weight:700;">{score:.1f}</td>
-                <td style="color:{COLORS['warning']}; font-size:0.82rem;">{warn}</td>
+                <td style="color:{COLORS['warning']}; font-size:0.82rem; word-wrap: break-word; padding-right: 15px;">{warn}</td>
             </tr>
             """
         )
@@ -348,30 +348,30 @@ def render_forecast_card(forecast: dict) -> None:
         regime = _esc(data.get("regime", "—"))
 
         card_html = f"""
-        <div class="forecast-card">
-            <div class="horizon-title">📅 {h}-Day Forecast</div>
+        <div class="metric-card forecast-card" style="display:flex; flex-direction:column; gap:8px;">
+            <div class="horizon-title" style="margin-bottom:4px;">📅 {h}-Day Forecast</div>
 
-            <div class="forecast-row">
-                <span class="forecast-label text-red">🐻 Bear</span>
-                <span>
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                <span class="forecast-label text-red" style="min-width:60px;">🐻 Bear</span>
+                <span style="text-align:right;">
                     <span class="forecast-value">${bear:,.2f}</span>
-                    <span class="forecast-delta text-red">{_format_pct(bear_pct)}</span>
+                    <span class="forecast-delta text-red" style="margin-left:4px;">{_format_pct(bear_pct)}</span>
                 </span>
             </div>
 
-            <div class="forecast-row">
-                <span class="forecast-label text-yellow">📊 Base</span>
-                <span>
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                <span class="forecast-label text-yellow" style="min-width:60px;">📊 Base</span>
+                <span style="text-align:right;">
                     <span class="forecast-value">${base:,.2f}</span>
-                    <span class="forecast-delta text-yellow">{_format_pct(base_pct)}</span>
+                    <span class="forecast-delta text-yellow" style="margin-left:4px;">{_format_pct(base_pct)}</span>
                 </span>
             </div>
 
-            <div class="forecast-row">
-                <span class="forecast-label text-green">🐂 Bull</span>
-                <span>
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                <span class="forecast-label text-green" style="min-width:60px;">🐂 Bull</span>
+                <span style="text-align:right;">
                     <span class="forecast-value">${bull:,.2f}</span>
-                    <span class="forecast-delta text-green">{_format_pct(bull_pct)}</span>
+                    <span class="forecast-delta text-green" style="margin-left:4px;">{_format_pct(bull_pct)}</span>
                 </span>
             </div>
 
