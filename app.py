@@ -96,8 +96,7 @@ default_text = ", ".join(sorted(list(set(default_text_list))))
 tickers_input = st.sidebar.text_area(
     "Tickers to Scan (comma-separated)",
     value=default_text,
-    height=150,
-    key="sb_tickers_input"
+    height=150
 )
 
 run_scan = st.sidebar.button("Run Scan", key="sb_run_scan")
