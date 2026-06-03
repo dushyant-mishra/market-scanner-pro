@@ -348,6 +348,28 @@ with st.expander("📖 How to Use the Market Scanner"):
     Once complete, the dashboard will display a **Sector Heatmap**, your **Top 5 Breakout Candidates**, and a **Detailed Security Report** where you can investigate the charts, technical signals, options strategies, and structural causal paths for any individual stock!
     """)
 
+with st.expander("🧠 Understanding the Output"):
+    st.markdown("""
+    When the scan finishes, the dashboard will present you with several different metrics and visuals. Here is how to interpret them:
+
+    ### Top Candidates
+    - **Highest Upside (Bayesian Conviction):** These are the stocks that have the highest mathematical probability of experiencing a 50%+ upside move. The percentage you see is the **Posterior Probability**, which starts with fundamental profitability and is multiplied by causal volume signals, bullish chart patterns (like a Bull Flag), and positive FinBERT news sentiment.
+    - **Top Bullish (Multi-Factor):** This ranks stocks based on a classic 0-100 score. A score of 80+ means the stock has exceptional price momentum, strong institutional options flow (Call buying), and solid core fundamentals.
+
+    ### The Sector Heatmap
+    This visualization groups all scanned stocks by their industry sector. 
+    - The **Size** of the box represents the company's Market Cap (bigger box = bigger company).
+    - The **Color** represents the Multi-Factor Bull Score. Bright green means highly bullish, dark/red means bearish. It's a great way to quickly spot which sectors are leading the market.
+
+    ### Detailed Security Report
+    Select any individual stock from the dropdown to deep-dive into its data:
+    - **Performance Scores:** The visual gauges show the raw Bull and Bear scores. If the Bull score is high, the stock is showing strong upward conviction.
+    - **Category Breakdown:** See exactly *why* a stock scored highly (e.g., maybe its Fundamentals are weak, but its Options Flow is heavily bullish).
+    - **Analysis & Technicals Tab:** Here you can see the **Structural Causal Path** (proving whether volume is actually driving the price), the **FinBERT Sentiment** score from recent news, and the exact **Edwards & Magee** patterns detected on the chart.
+    - **Options Recommendations Tab:** Based on the stock's volatility and trend, the engine ranks the 10 best options strategies (like a LEAPS Call or a Credit Spread) specifically tailored to that stock's current environment.
+    - **Forecasts Tab:** Shows the statistically probable price range for the stock 30 and 90 days from now, based on historical volatility and momentum regimes.
+    """)
+
 if not st.session_state.scanned:
     # If backtest results exist, show summary
     if hasattr(st.session_state, 'backtest_results'):
