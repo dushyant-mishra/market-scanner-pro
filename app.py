@@ -16,6 +16,7 @@ import scoring.fundamental_screener as fundamental_screener
 import scoring.causal_model as causal_model
 import scoring.bayesian_inference as bayesian_inference
 import indicators.pattern_recognition as pattern_recognition
+import scoring.sentiment as sentiment
 from backtest.engine import BacktestRunner
 import ui.styles as styles
 import ui.components as components
@@ -239,8 +240,14 @@ if run_scan:
                     hist_with_ind, sector_hist, spy_hist, fundamental_results
                 )
                 
+                # 10. NLP Sentiment Analysis
+                news_texts = fetcher.get_news(ticker)
+                sentiment_data = sentiment.calculate_news_sentiment(news_texts)
+                sentiment_score = sentiment_data.get("score", 0.0)
+                
+                # 11. Bayesian Inference Integration
                 bayesian_results = bayesian_inference.calculate_bayesian_conviction(
-                    quality_score, causal_results, patterns
+                    quality_score, causal_results, patterns, sentiment_score
                 )
                 
                 forecasts_dict = raw_forecast.get("forecasts", {})
@@ -266,6 +273,7 @@ if run_scan:
                     },
                     "fundamental_results": fundamental_results,
                     "causal_results": causal_results,
+                    "sentiment": sentiment_data,
                     "bayesian_results": bayesian_results,
                     "hist": hist_with_ind
                 }
@@ -467,7 +475,8 @@ else:
                 components.render_causal_analysis_card(
                     details.get("causal_results", {}), 
                     details.get("bayesian_results", {}),
-                    details.get("patterns", {})
+                    details.get("patterns", {}),
+                    details.get("sentiment", {})
                 )
             with fund_col:
                 components.render_fundamental_screen_table(details.get("fundamental_results", {}))

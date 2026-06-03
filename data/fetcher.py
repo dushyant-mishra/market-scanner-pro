@@ -428,3 +428,35 @@ def get_earnings_date(ticker: str) -> Optional[date]:
         return None
     except Exception:
         return None
+
+# =====================================================================
+# News data
+# =====================================================================
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_news(ticker: str) -> list[str]:
+    """Fetch recent news headlines and summaries for *ticker*.
+
+    Returns
+    -------
+    list[str]
+        A list of strings combining title and summary for the sentiment analyzer.
+    """
+    try:
+        tk = yf.Ticker(ticker)
+        news_items = tk.news
+        if not news_items:
+            return []
+        
+        texts = []
+        for item in news_items:
+            # yfinance news items often contain 'content' -> 'title', 'summary'
+            content = item.get('content', item) # fallback if structure is flat
+            title = content.get('title', '')
+            summary = content.get('summary', '')
+            if title or summary:
+                texts.append(f"{title}. {summary}".strip())
+        
+        return texts
+    except Exception:
+        return []

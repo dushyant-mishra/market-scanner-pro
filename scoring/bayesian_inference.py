@@ -1,4 +1,4 @@
-def calculate_bayesian_conviction(fundamental_quality: float, causal_signals: dict, patterns: dict) -> dict:
+def calculate_bayesian_conviction(fundamental_quality: float, causal_signals: dict, patterns: dict, sentiment_score: float = 0.0) -> dict:
     """
     Calculate the Bayesian Conviction Probability of a 50%+ Upside Breakout.
     
@@ -65,6 +65,20 @@ def calculate_bayesian_conviction(fundamental_quality: float, causal_signals: di
     if patterns.get("gap") == "gap_up" and high_volume:
         odds *= 1.5
         evidence_log.append("Edwards & Magee: Breakaway Gap Up on High Volume -> 1.5x Odds")
+        
+    # 4. NLP FinBERT Sentiment Evidence
+    if sentiment_score > 0.8:
+        odds *= 2.0
+        evidence_log.append(f"FinBERT Sentiment: Extremely Bullish ({sentiment_score:+.2f}) -> 2.0x Odds")
+    elif sentiment_score > 0.3:
+        odds *= 1.5
+        evidence_log.append(f"FinBERT Sentiment: Bullish ({sentiment_score:+.2f}) -> 1.5x Odds")
+    elif sentiment_score < -0.8:
+        odds *= 0.25
+        evidence_log.append(f"FinBERT Sentiment: Extremely Bearish ({sentiment_score:+.2f}) -> 0.25x Odds")
+    elif sentiment_score < -0.3:
+        odds *= 0.5
+        evidence_log.append(f"FinBERT Sentiment: Bearish ({sentiment_score:+.2f}) -> 0.5x Odds")
         
     # Convert back to probability
     posterior = odds / (1 + odds)

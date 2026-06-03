@@ -550,43 +550,51 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
     footer = "</tbody></table></div>"
     _render_html(header + "".join(rows) + footer)
 
-def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results: dict[str, Any] = None, patterns: dict[str, Any] = None) -> None:
-    """Render the causal modeling, bayesian, and pattern insights."""
+def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results: dict[str, Any] = None, patterns: dict[str, Any] = None, sentiment_data: dict[str, Any] = None) -> None:
+    """Render the causal modeling, bayesian, pattern, and sentiment insights."""
     
     insights = causal_results.get("insights", [])
     
-    if not insights and not bayesian_results:
-        _render_html('<div class="risk-warning">No causal or bayesian insights available.</div>')
+    if not insights and not bayesian_results and not sentiment_data:
+        _render_html('<div class="risk-warning">No causal, bayesian, or sentiment insights available.</div>')
         return
 
     insights_html = "".join([f"<li>{_esc(msg)}</li>" for msg in insights])
     
-    scm = causal_results.get("scm_path", {})
-    tme = scm.get("total_market_effect", np.nan)
-    d = scm.get("d_vol_to_stock", np.nan)
-    
-    import pandas as pd
-    
     scm_html = ""
-    if pd.notna(tme):
-        scm_html = textwrap.dedent(f"""
-            <div style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                <h4 style="margin-top: 0; color:#e0e6ed;">Structural Path Analysis</h4>
-                <div class="score-row">
-                    <span class="score-badge {'score-high' if tme > 1.0 else 'score-medium'}">Total Market Beta: {tme:.2f}</span>
-                    <span class="score-badge {'score-high' if d > 0 else 'score-low'}">Volume Direct Effect: {d:.4f}</span>
+    if "scm_path" in causal_results:
+        path = causal_results["scm_path"]
+        scm_html = f"""
+            <div style="margin-top: 1rem; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                <div style="font-size: 0.8rem; color: #8892a0; margin-bottom: 4px;">Structural Causal Path</div>
+                <div style="font-family: monospace; color: {COLORS['accent']};">{path.get('volume_to_volatility', 'Volume')} &rarr; {path.get('volatility_to_price', 'Volatility &rarr; Price')}</div>
+            </div>
+        """
+        
+    sentiment_html = ""
+    if sentiment_data and sentiment_data.get("status") == "success":
+        score = sentiment_data.get("score", 0.0)
+        s_color = COLORS["bullish"] if score > 0.2 else COLORS["bearish"] if score < -0.2 else COLORS["neutral"]
+        s_text = "Bullish" if score > 0.2 else "Bearish" if score < -0.2 else "Neutral"
+        
+        sentiment_html = f"""
+            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                <h4 style="margin-top: 0; color:#00d4aa;">FinBERT Sentiment Analysis</h4>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color:{s_color};">{s_text}</div>
+                    <div class="text-secondary" style="font-size: 0.9rem;">(Score: {score:+.2f})</div>
                 </div>
             </div>
-        """)
+        """
         
     bayesian_html = ""
     if bayesian_results:
         prob = bayesian_results.get("posterior_prob", 0.0)
         evidence = bayesian_results.get("evidence_log", [])
-        evidence_list = "".join([f"<li>{_esc(msg)}</li>" for msg in evidence])
+        evidence_list = "".join([f"<li style='margin-bottom: 4px;'>{_esc(e)}</li>" for e in evidence])
         
         bayesian_html = textwrap.dedent(f"""
-            <div style="margin-top: 1rem; padding: 1rem; background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.2); border-radius: 8px;">
+            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
                 <h4 style="margin-top: 0; color:#00d4aa;">Bayesian Inference Engine</h4>
                 <div style="font-size: 2rem; font-weight: 700; color:#fff; margin-bottom: 0.5rem;">
                     {prob*100:.0f}% <span style="font-size:0.9rem; color:#8892a0; font-weight:400;">Conviction Probability</span>
@@ -623,6 +631,7 @@ def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results
                 {insights_html}
             </ul>
             {scm_html}
+            {sentiment_html}
             {bayesian_html}
             {patterns_html}
         </div>
