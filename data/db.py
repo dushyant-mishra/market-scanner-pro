@@ -6,7 +6,8 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = "scans_data.db"
+import os
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scans_data.db")
 
 def init_db(db_path=DB_PATH):
     """Initialize the SQLite database with the required tables."""
