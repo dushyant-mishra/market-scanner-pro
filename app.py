@@ -197,7 +197,12 @@ if run_scan:
                     continue  # Filter out tickers that fail the quality score threshold
                 
                 # 5. Extract continuous numeric confidence
-                numeric_confidence = float(scores.get("confidence", 30.0))
+                raw_conf = scores.get("confidence", 30.0)
+                if isinstance(raw_conf, str):
+                    # Handle cached module returning old strings
+                    numeric_confidence = {"high": 90.0, "medium": 60.0, "low": 30.0}.get(raw_conf.lower(), 30.0)
+                else:
+                    numeric_confidence = float(raw_conf)
                 
                 # 6. Evaluate option strategies and map keys
                 strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features)
