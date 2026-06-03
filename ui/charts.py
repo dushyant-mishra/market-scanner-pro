@@ -416,40 +416,42 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     df : pd.DataFrame
         Columns: ticker, sector, marketCap, bull_score, last_price.
     """
-    fig = go.Figure(
-        go.Treemap(
-            labels=df["ticker"],
-            parents=df["sector"],
-            values=df["marketCap"],
-            marker=dict(
-                colors=df["bull_score"],
-                colorscale=[
-                    [0.0, COLORS["bearish"]],
-                    [0.5, COLORS["neutral"]],
-                    [1.0, COLORS["bullish"]],
-                ],
-                cmin=0,
-                cmax=100,
-                colorbar=dict(
-                    title=dict(
-                        text="Bull Score",
-                        font=dict(color=COLORS["text_secondary"])
-                    ),
-                    thickness=12,
-                    len=0.6,
-                    tickfont=dict(color=COLORS["text_secondary"]),
-                ),
-                line=dict(width=1, color=COLORS["bg_primary"]),
+    import plotly.express as px
+    
+    # Use px.treemap to automatically generate parent nodes (sectors)
+    fig = px.treemap(
+        df,
+        path=["sector", "ticker"],
+        values="marketCap",
+        color="bull_score",
+        color_continuous_scale=[
+            [0.0, COLORS["bearish"]],
+            [0.5, COLORS["neutral"]],
+            [1.0, COLORS["bullish"]],
+        ],
+        range_color=[0, 100],
+    )
+    
+    fig.update_traces(
+        marker=dict(line=dict(width=1, color=COLORS["bg_primary"])),
+        texttemplate="<b>%{label}</b><br>%{color:.0f}",
+        hovertemplate=(
+            "<b>%{label}</b><br>"
+            "Bull Score: %{color:.1f}<br>"
+            "Market Cap: $%{value:,.0f}<br>"
+            "<extra></extra>"
+        )
+    )
+    
+    fig.update_coloraxes(
+        colorbar=dict(
+            title=dict(
+                text="Bull Score",
+                font=dict(color=COLORS["text_secondary"])
             ),
-            texttemplate="<b>%{label}</b><br>%{color:.0f}",
-            hovertemplate=(
-                "<b>%{label}</b><br>"
-                "Sector: %{parent}<br>"
-                "Bull Score: %{color:.1f}<br>"
-                "Market Cap: $%{value:,.0f}<br>"
-                "<extra></extra>"
-            ),
-            branchvalues="total",
+            thickness=12,
+            len=0.6,
+            tickfont=dict(color=COLORS["text_secondary"]),
         )
     )
 
