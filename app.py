@@ -335,6 +335,7 @@ with st.expander("📖 How to Use the Market Scanner"):
     ### 2. Configure Advanced Analysis
     - **Run Full Fundamental Screen:** Keep this checked to rigorously analyze SEC balance sheets (ROE, Margins, Debt-to-Equity). 
     - **Minimum Quality Score:** Filter out stocks that do not meet a certain fundamental quality threshold.
+    - **Enable Backtest:** Check this to simulate past performance. The system will time-travel back to your chosen start date, execute simulated trades based on the strategy's signals, and output the total hypothetical P&L, Max Drawdown, and Win Rate.
 
     ### 3. Run the Scan
     Click the **Run Scan** button. The engine will:
