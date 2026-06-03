@@ -33,15 +33,29 @@ def get_russell_3000_tickers():
         import requests
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         
-        # We can pull the S&P 500 list from Wikipedia as a strong starting point
+        # We can pull the S&P 500 list from Wikipedia
         resp_sp500 = requests.get('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=headers)
         tables = pd.read_html(resp_sp500.text)
-        sp500 = tables[0]['Symbol'].tolist()
+        sp500 = []
+        for t in tables:
+            if 'Symbol' in t.columns:
+                sp500 = t['Symbol'].tolist()
+                break
+            elif 'Ticker' in t.columns:
+                sp500 = t['Ticker'].tolist()
+                break
         
         # We can also add Nasdaq 100
         resp_ndx = requests.get('https://en.wikipedia.org/wiki/Nasdaq-100', headers=headers)
         tables_ndx = pd.read_html(resp_ndx.text)
-        ndx = tables_ndx[4]['Ticker'].tolist()
+        ndx = []
+        for t in tables_ndx:
+            if 'Ticker' in t.columns:
+                ndx = t['Ticker'].tolist()
+                break
+            elif 'Symbol' in t.columns:
+                ndx = t['Symbol'].tolist()
+                break
         
         combined = list(set(sp500 + ndx))
         # Replace '.' with '-' for Yahoo Finance (e.g., BRK.B -> BRK-B)
