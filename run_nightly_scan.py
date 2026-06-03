@@ -30,12 +30,17 @@ def get_russell_3000_tickers():
     """
     # Fetching a reliable large universe
     try:
+        import requests
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        
         # We can pull the S&P 500 list from Wikipedia as a strong starting point
-        tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+        resp_sp500 = requests.get('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=headers)
+        tables = pd.read_html(resp_sp500.text)
         sp500 = tables[0]['Symbol'].tolist()
         
         # We can also add Nasdaq 100
-        tables_ndx = pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100')
+        resp_ndx = requests.get('https://en.wikipedia.org/wiki/Nasdaq-100', headers=headers)
+        tables_ndx = pd.read_html(resp_ndx.text)
         ndx = tables_ndx[4]['Ticker'].tolist()
         
         combined = list(set(sp500 + ndx))
