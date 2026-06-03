@@ -325,6 +325,28 @@ if run_scan:
 # -------------------------------------------------------------
 components.render_header()
 
+with st.expander("📖 How to Use the Market Scanner"):
+    st.markdown("""
+    **Welcome to Market Scanner V2.** This institutional-grade dashboard fuses Bayesian inference, Causal Machine Learning, Edwards & Magee Pattern Recognition, and NLP Sentiment to find high-upside stock opportunities.
+
+    ### 1. Select Your Ticker Universe
+    On the left sidebar, use the dropdown to select predefined universes like the **S&P 500** or **Nasdaq 100**. The tickers will automatically populate in the text area below. You can also manually type ticker symbols (e.g., `AAPL, MSFT, TSLA`), or upload a Fidelity Portfolio CSV.
+
+    ### 2. Configure Advanced Analysis
+    - **Run Full Fundamental Screen:** Keep this checked to rigorously analyze SEC balance sheets (ROE, Margins, Debt-to-Equity). 
+    - **Minimum Quality Score:** Filter out stocks that do not meet a certain fundamental quality threshold.
+
+    ### 3. Run the Scan
+    Click the **Run Scan** button. The engine will:
+    - Download years of historical pricing, fundamentals, and options data.
+    - Run the **Bayesian-Causal Engine** to determine the exact mathematical probability of a 50%+ upside breakout.
+    - Run the **FinBERT NLP** model on the latest news headlines to analyze market sentiment.
+    - Hunt for classic Edwards & Magee breakout patterns.
+    
+    ### 4. Review the Output
+    Once complete, the dashboard will display a **Sector Heatmap**, your **Top 5 Breakout Candidates**, and a **Detailed Security Report** where you can investigate the charts, technical signals, options strategies, and structural causal paths for any individual stock!
+    """)
+
 if not st.session_state.scanned:
     # If backtest results exist, show summary
     if hasattr(st.session_state, 'backtest_results'):
