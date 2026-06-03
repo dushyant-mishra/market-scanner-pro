@@ -64,7 +64,7 @@ if st.sidebar.button("Load Overnight Data", type="primary"):
 components.render_header()
 
 st.markdown("""
-### ⚡ Ultra-Fast Overnight Data Viewer
+### Ultra-Fast Overnight Data Viewer
 Welcome to V2. This viewer bypasses all heavy machine learning APIs and instantly loads the results processed by your Google Colab / Local Headless Scanner.
 """)
 
