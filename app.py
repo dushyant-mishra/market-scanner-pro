@@ -27,7 +27,6 @@ import ui.charts as charts
 # -------------------------------------------------------------
 st.set_page_config(
     page_title="Market Scanner V2 — AI-Powered Stock & Options Research Engine",
-    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -325,7 +324,7 @@ if run_scan:
 # -------------------------------------------------------------
 components.render_header()
 
-with st.expander("📖 How to Use the Market Scanner"):
+with st.expander("How to Use the Market Scanner"):
     st.markdown("""
     **Welcome to Market Scanner V2.** This institutional-grade dashboard fuses Bayesian inference, Causal Machine Learning, Edwards & Magee Pattern Recognition, and NLP Sentiment to find high-upside stock opportunities.
 
@@ -348,7 +347,7 @@ with st.expander("📖 How to Use the Market Scanner"):
     Once complete, the dashboard will display a **Sector Heatmap**, your **Top 5 Breakout Candidates**, and a **Detailed Security Report** where you can investigate the charts, technical signals, options strategies, and structural causal paths for any individual stock!
     """)
 
-with st.expander("🧠 Understanding the Output"):
+with st.expander("Understanding the Output"):
     st.markdown("""
     When the scan finishes, the dashboard will present you with several different metrics and visuals. Here is how to interpret them:
 
@@ -374,7 +373,7 @@ if not st.session_state.scanned:
     # If backtest results exist, show summary
     if hasattr(st.session_state, 'backtest_results'):
         bt = st.session_state.backtest_results
-        st.subheader("📈 Backtest Summary")
+        st.subheader("Backtest Summary")
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total P&L", f"${bt['total_pnl']:.2f}")
