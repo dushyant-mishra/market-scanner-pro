@@ -83,12 +83,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
         components.render_top5_upside_cards(df)
         st.markdown("<br>", unsafe_allow_html=True)
         
-    # Sector Heatmap
-    st.subheader("Industry Sector Heatmap")
-    st.markdown("Quickly identify which sectors have the strongest bullish momentum.")
-    components.render_sector_heatmap(df)
-    st.markdown("<br>", unsafe_allow_html=True)
-    
+
     # Detailed Stock View
     st.markdown("---")
     st.subheader("Detailed Security Report")
