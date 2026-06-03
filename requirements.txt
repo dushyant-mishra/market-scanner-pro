@@ -6,3 +6,6 @@ plotly>=5.18
 torch
 transformers
 statsmodels
+hmmlearn
+lxml
+scikit-learn
