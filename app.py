@@ -196,9 +196,8 @@ if run_scan:
                 if quality_score < min_quality_score:
                     continue  # Filter out tickers that fail the quality score threshold
                 
-                # 5. Numeric confidence mapping for gauges & components
-                confidence_map = {"high": 90.0, "medium": 60.0, "low": 30.0}
-                numeric_confidence = confidence_map.get(scores.get("confidence", "low"), 30.0)
+                # 5. Extract continuous numeric confidence
+                numeric_confidence = float(scores.get("confidence", 30.0))
                 
                 # 6. Evaluate option strategies and map keys
                 strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features)

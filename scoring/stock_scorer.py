@@ -487,27 +487,53 @@ def _compute_confidence(
     options_data: dict,
     fundamentals: dict,
     technical: dict,
-) -> str:
-    """Confidence = how many data sources returned valid data."""
-    sources_available = 0
-    total_sources = 4
+) -> float:
+    """Confidence = percentage of available data features + volume liquidity bonus."""
+    total_features = 0
+    valid_features = 0
 
-    if price_features and price_features.get("close"):
-        sources_available += 1
-    if options_data and (options_data.get("total_call_volume") or options_data.get("total_call_oi")):
-        sources_available += 1
-    if fundamentals and (fundamentals.get("pe_ratio") or fundamentals.get("revenue_growth")):
-        sources_available += 1
-    if technical and technical.get("rsi"):
-        sources_available += 1
-
-    ratio = sources_available / total_sources
-    if ratio >= 0.75:
-        return "high"
-    elif ratio >= 0.5:
-        return "medium"
+    # Check key fundamentals
+    fund_keys = ["pe_ratio", "forward_pe", "revenue_growth", "profit_margin", "analyst_rating"]
+    if fundamentals:
+        for k in fund_keys:
+            total_features += 1
+            if fundamentals.get(k) is not None and str(fundamentals.get(k)).lower() != "nan":
+                valid_features += 1
     else:
-        return "low"
+        total_features += len(fund_keys)
+
+    # Check options data
+    opt_keys = ["put_call_volume_ratio", "total_call_oi", "avg_call_iv", "leaps_call_oi"]
+    if options_data:
+        for k in opt_keys:
+            total_features += 1
+            if options_data.get(k) is not None and str(options_data.get(k)).lower() != "nan":
+                valid_features += 1
+    else:
+        total_features += len(opt_keys)
+        
+    # Check technicals
+    tech_keys = ["rsi", "macd", "bb_pct_b", "atr_pct"]
+    if technical:
+        for k in tech_keys:
+            total_features += 1
+            if technical.get(k) is not None and str(technical.get(k)).lower() != "nan":
+                valid_features += 1
+    else:
+        total_features += len(tech_keys)
+        
+    # Base confidence is data completeness
+    base_confidence = (valid_features / max(total_features, 1)) * 100.0
+    
+    # Adjust confidence slightly based on average daily volume (more liquidity = higher confidence)
+    volume = price_features.get("avg_volume_20d") if price_features else 0
+    if volume is not None and str(volume).lower() != "nan":
+        if volume > 5_000_000:
+            base_confidence = min(100.0, base_confidence + 10)
+        elif volume < 500_000:
+            base_confidence = max(0.0, base_confidence - 10)
+            
+    return _clamp(base_confidence)
 
 
 def _generate_reasons(
