@@ -260,7 +260,7 @@ def render_top5_upside_cards(df) -> None:
                 <span class="delta-positive" style="font-size: 0.9rem; font-weight:700;">Target: {sign}{upside:.1f}%</span>
             </div>
             <div class="text-secondary" style="font-size:0.72rem; margin-top:0.3rem;">
-                Quality Score: {quality}%
+                Quality Score: {quality:.0f}%
             </div>
         </div>
         """
@@ -484,7 +484,7 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
     header = textwrap.dedent(
         f"""
         <div style="margin-bottom: 1rem;">
-            <h3>Fidelity Quality Score: <span class="score-badge {score_cls}">{quality_score}%</span></h3>
+            <h3>Fidelity Quality Score: <span class="score-badge {score_cls}">{quality_score:.0f}%</span></h3>
         </div>
         <div class="table-container">
         <table class="strategy-table" style="width: 100%;">
