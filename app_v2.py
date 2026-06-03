@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 
 # Internal modules
-from data.universe import SECTOR_MAP
 from data import db
-from ui import components
+from ui import components, styles
 
 # -------------------------------------------------------------
 # App Configuration & SEO Best Practices
@@ -16,47 +15,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# -------------------------------------------------------------
-# Custom CSS
-# -------------------------------------------------------------
-st.markdown("""
-<style>
-    /* Dark Theme Core */
-    :root {
-        --background: #0e1117;
-        --surface: #1e2532;
-        --primary: #3b82f6;
-        --success: #10b981;
-        --danger: #ef4444;
-        --warning: #f59e0b;
-        --text: #f8fafc;
-        --text-secondary: #94a3b8;
-        --border: #334155;
-    }
-    
-    /* Overall app styling */
-    .stApp {
-        background-color: var(--background);
-        color: var(--text);
-        font-family: 'Inter', 'Roboto', sans-serif;
-    }
-    
-    /* General card styling */
-    .metric-card {
-        background-color: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.2rem;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        border-color: rgba(59, 130, 246, 0.5);
-    }
-</style>
-""", unsafe_allow_html=True)
+# Inject professional V1 styling
+styles.inject_custom_css()
 
 # -------------------------------------------------------------
 # Session State
