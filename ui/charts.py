@@ -418,6 +418,26 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     """
     import plotly.express as px
     
+    # Clean and sanitize the DataFrame to prevent any NaN values from propagating
+    df = df.copy()
+    
+    # Standardize market cap column name if needed
+    if "market_cap" in df.columns and "marketCap" not in df.columns:
+        df = df.rename(columns={"market_cap": "marketCap"})
+        
+    # Fill missing or invalid values for category columns
+    df["sector"] = df["sector"].fillna("Other").astype(str).str.strip()
+    df["sector"] = df["sector"].replace({"": "Other", "None": "Other", "nan": "Other", "N/A": "Other"})
+    df["ticker"] = df["ticker"].fillna("Unknown").astype(str).str.strip()
+    
+    # Ensure numeric columns are strictly numeric and contain no NaNs
+    df["bull_score"] = pd.to_numeric(df["bull_score"], errors="coerce").fillna(50.0)
+    df["marketCap"] = pd.to_numeric(df["marketCap"], errors="coerce").fillna(1e9)
+    df["last_price"] = pd.to_numeric(df["last_price"], errors="coerce").fillna(0.0)
+    
+    # Keep only rows with positive market cap (required by Plotly treemap)
+    df = df[df["marketCap"] > 0]
+    
     # Use px.treemap to automatically generate parent nodes (sectors)
     fig = px.treemap(
         df,

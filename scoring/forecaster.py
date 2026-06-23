@@ -196,6 +196,7 @@ def forecast_price_range(
 
         daily_returns = close.pct_change().dropna()
         # Model prediction step (if enabled)
+        nn_output = None
         if ML_MODEL == "custom_nn":
             from ml.nn_model import predict as nn_predict
             # Build feature dict for NN (use same price_features as later)
@@ -206,17 +207,18 @@ def forecast_price_range(
                 "ma200": float(close.rolling(200).mean().iloc[-1]),
                 "realized_vol_20d": float(daily_returns.rolling(20).std().iloc[-1] * _ANNUALIZATION),
                 "realized_vol_60d": float(daily_returns.rolling(60).std().iloc[-1] * _ANNUALIZATION),
-                "avg_volume_20d": 0.0,
-                "avg_volume_60d": 0.0,
+                "avg_volume_20d": float(hist["Volume"].rolling(20).mean().iloc[-1]) if "Volume" in hist else 0.0,
+                "avg_volume_60d": float(hist["Volume"].rolling(60).mean().iloc[-1]) if "Volume" in hist else 0.0,
                 "rsi": _safe(technical.get("rsi")),
                 "atr_pct": _safe(technical.get("atr_pct")),
                 "iv": _safe(technical.get("iv")),
                 "beta": _safe(technical.get("beta")),
             }
-            nn_output = nn_predict(features)
-            # Overwrite base multipliers with NN predictions (optional)
-            # This is a placeholder – real integration would blend forecasts.
-            pass
+            try:
+                nn_output = nn_predict(features)
+            except Exception as e:
+                logger.debug(f"NN Predict failed: {e}")
+                nn_output = None
         if daily_returns.empty:
             return default
 
@@ -239,6 +241,7 @@ def forecast_price_range(
                 bull_pctile,
                 regime,
                 technical,
+                nn_output,
             )
             if horizon_forecast is not None:
                 forecasts[horizon] = horizon_forecast
@@ -278,6 +281,7 @@ def _forecast_single_horizon(
     bull_pctile: float,
     regime: str,
     technical: dict,
+    nn_output: dict | None = None,
 ) -> dict | None:
     """Create forecasts for a single horizon, applying optional NN adjustments.
 
@@ -334,6 +338,19 @@ def _forecast_single_horizon(
         bear_pct = bear_pct * vol_adj + trend_adj + rsi_adj
         base_pct = base_pct * vol_adj + trend_adj + rsi_adj
         bull_pct = bull_pct * vol_adj + trend_adj + rsi_adj
+
+        # Blend with NN if available (NN is trained for 30d so we scale it for 90d)
+        if nn_output is not None:
+            time_scaler = np.sqrt(horizon / 30.0) if horizon != 30 else 1.0
+            
+            nn_bear_pct = (nn_output["bear_multiplier"] - 1.0) * time_scaler
+            nn_base_pct = (nn_output["base_multiplier"] - 1.0) * time_scaler
+            nn_bull_pct = (nn_output["bull_multiplier"] - 1.0) * time_scaler
+            
+            # Blend 50/50
+            bear_pct = 0.5 * bear_pct + 0.5 * nn_bear_pct
+            base_pct = 0.5 * base_pct + 0.5 * nn_base_pct
+            bull_pct = 0.5 * bull_pct + 0.5 * nn_bull_pct
 
         # Prices
         bear_price = round(current_price * (1 + bear_pct), 2)

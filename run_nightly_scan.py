@@ -113,8 +113,8 @@ def run_nightly_scan():
                 "avg_volume_60d": float(hist["Volume"].rolling(60).mean().iloc[-1]),
             }
             
-            # 4. Multi-Factor Scoring
-            scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators)
+            # 4. Multi-Factor Scoring (includes historical regime + backtest indicators)
+            scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators, hist)
             
             fundamental_results = fundamental_screener.run_fundamental_screen(
                 fundamentals, tech_indicators, price_features, income_stmt, balance_sheet

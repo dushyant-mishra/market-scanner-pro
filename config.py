@@ -7,13 +7,15 @@ Constants, scoring weights, strategy definitions, and UI settings.
 # Scoring weights  (must sum to 1.0)
 # ---------------------------------------------------------------------
 SCORING_WEIGHTS = {
-    "trend": 0.25,
-    "momentum": 0.15,
-    "options_flow": 0.20,
-    "leaps": 0.15,
+    "trend": 0.20,
+    "momentum": 0.10,
+    "options_flow": 0.15,
+    "leaps": 0.10,
     "fundamentals": 0.10,
     "sector": 0.10,
     "volume": 0.05,
+    "historical_regime": 0.10,
+    "historical_backtest": 0.10,
 }
 
 # ---------------------------------------------------------------------

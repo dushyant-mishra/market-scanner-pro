@@ -186,7 +186,7 @@ if run_scan:
                 }
                 
                 # 4. Multi-factor Stock Scoring & Fundamentals
-                scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators)
+                scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators, hist)
                 
                 fundamental_results = fundamental_screener.run_fundamental_screen(
                     fundamentals, tech_indicators, price_features, income_stmt, balance_sheet
@@ -393,7 +393,10 @@ else:
     
     # 1. Sector Heatmap (rendered if 2 or more stocks exist)
     if len(scan_df) >= 2:
-        heatmap_fig = charts.create_sector_heatmap(scan_df)
+        heatmap_df = scan_df.copy()
+        if 'market_cap' in heatmap_df.columns and 'marketCap' not in heatmap_df.columns:
+            heatmap_df = heatmap_df.rename(columns={'market_cap': 'marketCap'})
+        heatmap_fig = charts.create_sector_heatmap(heatmap_df)
         st.plotly_chart(heatmap_fig, use_container_width=True)
     
     st.markdown("---")
@@ -467,8 +470,12 @@ else:
             chart_col, score_col = st.columns([2, 1])
             
             with chart_col:
-                price_fig = charts.create_price_chart(details["hist"], selected_ticker)
-                st.plotly_chart(price_fig, use_container_width=True)
+                hist_df = details.get("hist")
+                if isinstance(hist_df, pd.DataFrame) and not hist_df.empty and "Open" in hist_df.columns:
+                    price_fig = charts.create_price_chart(hist_df, selected_ticker)
+                    st.plotly_chart(price_fig, use_container_width=True)
+                else:
+                    st.info("Historical price data is not available for this ticker.")
                 
             with score_col:
                 st.markdown("##### Performance Scores")
@@ -523,7 +530,9 @@ else:
                     details.get("causal_results", {}), 
                     details.get("bayesian_results", {}),
                     details.get("patterns", {}),
-                    details.get("sentiment", {})
+                    details.get("sentiment", {}),
+                    details.get("scores", {}).get("lookalike_stats", {}),
+                    details.get("scores", {}).get("win_rate_stats", {})
                 )
             with fund_col:
                 components.render_fundamental_screen_table(details.get("fundamental_results", {}))

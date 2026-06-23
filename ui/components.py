@@ -551,7 +551,14 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
     footer = "</tbody></table></div>"
     _render_html(header + "".join(rows) + footer)
 
-def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results: dict[str, Any] = None, patterns: dict[str, Any] = None, sentiment_data: dict[str, Any] = None) -> None:
+def render_causal_analysis_card(
+    causal_results: dict[str, Any], 
+    bayesian_results: dict[str, Any] = None, 
+    patterns: dict[str, Any] = None, 
+    sentiment_data: dict[str, Any] = None,
+    lookalike_stats: dict[str, Any] = None,
+    win_rate_stats: dict[str, Any] = None,
+) -> None:
     """Render the causal modeling, bayesian, pattern, and sentiment insights."""
     
     insights = causal_results.get("insights", [])
@@ -624,6 +631,27 @@ def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results
                     <div style="display:flex; flex-wrap:wrap;">{p_list}</div>
                 </div>
             """
+            
+    historical_html = ""
+    if lookalike_stats or win_rate_stats:
+        win90 = win_rate_stats.get("win_rate_90d", 0) if win_rate_stats else 0
+        avg90 = lookalike_stats.get("avg_90d_return", 0) * 100 if lookalike_stats else 0
+        
+        historical_html = f"""
+            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                <h4 style="margin-top: 0; color:#00d4aa;">Historical Backtest & Regime Match</h4>
+                <div style="display:flex; justify-content: space-between; margin-top: 0.5rem;">
+                    <div>
+                        <div class="text-secondary" style="font-size: 0.8rem;">90-Day Strategy Win-Rate</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color:{COLORS['bullish'] if win90 > 50 else COLORS['bearish']};">{win90:.1f}%</div>
+                    </div>
+                    <div>
+                        <div class="text-secondary" style="font-size: 0.8rem;">Lookalike 90-Day Avg Return</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color:{COLORS['bullish'] if avg90 > 0 else COLORS['bearish']};">{avg90:+.1f}%</div>
+                    </div>
+                </div>
+            </div>
+        """
 
     card_html = textwrap.dedent(f"""
         <div class="metric-card" style="margin-top: 1rem;">
@@ -635,6 +663,7 @@ def render_causal_analysis_card(causal_results: dict[str, Any], bayesian_results
             {sentiment_html}
             {bayesian_html}
             {patterns_html}
+            {historical_html}
         </div>
     """)
     _render_html(card_html)

@@ -42,17 +42,31 @@ class PriceRangeNN(nn.Module):
         return torch.exp(self.out(x))
 
 
+import os
+
 # Singleton model instance – loaded lazily
 _model: PriceRangeNN | None = None
-
+_model_stats = {"X_mean": None, "X_std": None}
 
 def _load_model(device: str = "cpu"):
-    global _model
+    global _model, _model_stats
     if _model is None:
         _model = PriceRangeNN()
-        # In a real deployment we would load state_dict from a checkpoint.
-        # Here we keep the randomly‑initialized model which still provides
-        # deterministic output for demonstration purposes.
+        
+        # Try to load trained weights
+        weights_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "nn_weights.pt")
+        if os.path.exists(weights_path):
+            try:
+                checkpoint = torch.load(weights_path, map_location=device)
+                if 'model_state_dict' in checkpoint:
+                    _model.load_state_dict(checkpoint['model_state_dict'])
+                    _model_stats['X_mean'] = checkpoint.get('X_mean')
+                    _model_stats['X_std'] = checkpoint.get('X_std')
+                else:
+                    _model.load_state_dict(checkpoint) # fallback for old formats
+            except Exception as e:
+                print(f"Error loading model weights: {e}")
+                
         _model.to(device)
         _model.eval()
     return _model
@@ -85,6 +99,13 @@ def predict(features: dict, device: str = "cpu") -> dict:
     vector = [float(features.get(k, 0.0)) for k in feature_order]
     tensor = torch.tensor(vector, dtype=torch.float32).unsqueeze(0).to(device)
     model = _load_model(device)
+    
+    # Scale inputs if stats exist
+    if _model_stats['X_mean'] is not None and _model_stats['X_std'] is not None:
+        mean = _model_stats['X_mean'].to(device)
+        std = _model_stats['X_std'].to(device)
+        tensor = (tensor - mean) / std
+        
     with torch.no_grad():
         out = model(tensor).squeeze(0).cpu().numpy()
     bear_mul, base_mul, bull_mul = out.tolist()

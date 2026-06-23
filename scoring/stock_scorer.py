@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import logging
 from typing import Dict, List
+import pandas as pd
 
 from config import SCORING_WEIGHTS, SCORE_THRESHOLDS
+from scoring.historical_regime import find_historical_lookalikes
+from scoring.backtest_filter import get_historical_win_rate
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +362,7 @@ def score_stock(
     options_data: dict,
     fundamentals: dict,
     technical: dict,
+    hist: pd.DataFrame = None,
 ) -> Dict[str, object]:
     """Compute weighted bull / bear / risk scores with explanations.
 
@@ -374,6 +378,8 @@ def score_stock(
         Company fundamentals from fetcher.
     technical : dict
         Output of ``calculate_all_indicators()``.
+    hist : pd.DataFrame, optional
+        Historical price dataframe.
 
     Returns
     -------
@@ -387,6 +393,26 @@ def score_stock(
     technical = technical or {}
 
     try:
+        lookalike_stats = find_historical_lookalikes(hist, price_features) if hist is not None else {}
+        win_rate_stats = get_historical_win_rate(hist) if hist is not None else {}
+        
+        # Calculate scores for historical indicators
+        historical_regime_score = 50.0
+        if lookalike_stats.get("avg_90d_return", 0) > 0:
+            historical_regime_score += 15 + (lookalike_stats["avg_90d_return"] * 100)
+        elif lookalike_stats.get("avg_90d_return", 0) < 0:
+            historical_regime_score -= 15 + (abs(lookalike_stats["avg_90d_return"]) * 100)
+            
+        historical_backtest_score = 50.0
+        win_90d = win_rate_stats.get("win_rate_90d", 0)
+        if win_90d > 60:
+            historical_backtest_score += (win_90d - 50)
+        elif win_90d > 0 and win_90d < 40:
+            historical_backtest_score -= (50 - win_90d)
+            
+        historical_regime_score = _clamp(historical_regime_score)
+        historical_backtest_score = _clamp(historical_backtest_score)
+        
         # Category scores
         category_scores = {
             "trend": calculate_trend_score(price_features),
@@ -396,6 +422,8 @@ def score_stock(
             "fundamentals": calculate_fundamentals_score(fundamentals),
             "sector": calculate_sector_score(fundamentals),
             "volume": calculate_volume_score(price_features),
+            "historical_regime": historical_regime_score,
+            "historical_backtest": historical_backtest_score,
         }
 
         # Weighted bull score
@@ -426,6 +454,8 @@ def score_stock(
             "category_scores": {k: round(v, 1) for k, v in category_scores.items()},
             "reasons": reasons[:5],
             "warnings": warnings[:5],
+            "lookalike_stats": lookalike_stats,
+            "win_rate_stats": win_rate_stats,
         }
 
     except Exception:

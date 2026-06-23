@@ -64,10 +64,17 @@ def json_to_df(json_str):
     if not json_str:
         return pd.DataFrame()
     try:
-        df = pd.read_json(json_str, orient="index")
+        import json as _json
+        data = _json.loads(json_str)
+        if not isinstance(data, dict) or not data:
+            return pd.DataFrame()
+        df = pd.DataFrame.from_dict(data, orient="index")
         # Try converting index back to datetime if possible
+        # but only if the index looks like timestamps, not plain ints
         try:
-            df.index = pd.to_datetime(df.index)
+            sample = str(list(data.keys())[0])
+            if not sample.isdigit():
+                df.index = pd.to_datetime(df.index)
         except:
             pass
         return df
