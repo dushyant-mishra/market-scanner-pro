@@ -1,4 +1,5 @@
 import math
+import os
 import time
 import numpy as np
 import pandas as pd
@@ -104,6 +105,37 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Advanced Analysis")
 run_full_fundamentals = st.sidebar.checkbox("Run Full Fundamental Screen", value=True, help="Fetches financial statements to calculate deep fundamental metrics like ROIC and Interest Coverage.")
 min_quality_score = st.sidebar.slider("Minimum Quality Score (%)", 0, 100, 0, 10)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 Neural Network Forecast")
+
+# Check if trained weights exist
+_nn_weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "nn_weights.pt")
+_nn_weights_exist = os.path.exists(_nn_weights_path)
+
+enable_nn = st.sidebar.checkbox(
+    "Enable Neural Network Model",
+    value=_nn_weights_exist,
+    key="sb_enable_nn",
+    help="Blend the custom PyTorch feed-forward neural network into price forecasts. "
+         "The model must be trained first (run ml/train_model.py)."
+)
+
+if _nn_weights_exist:
+    _nn_size_bytes = os.path.getsize(_nn_weights_path)
+    if _nn_size_bytes < 1024 * 1024:
+        _nn_size_str = f"{_nn_size_bytes / 1024:.1f} KB"
+    else:
+        _nn_size_str = f"{_nn_size_bytes / (1024 * 1024):.1f} MB"
+    st.sidebar.success(f"Trained weights found ({_nn_size_str})")
+else:
+    st.sidebar.warning("No trained weights found. Run `python ml/train_model.py` to train the model.")
+    if enable_nn:
+        st.sidebar.info("The NN will run with random (untrained) weights — forecasts may be unreliable.")
+
+# Patch config.ML_MODEL so the shared forecaster respects the toggle
+import config as _cfg
+_cfg.ML_MODEL = "custom_nn" if enable_nn else "none"
 
 st.sidebar.markdown("---")
 # Backtest toggle
