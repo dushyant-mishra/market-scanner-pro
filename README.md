@@ -95,10 +95,29 @@ The interactive and nightly scanners include an explicit **PHLX AI Semiconductor
    ```bash
    pip install -r requirements.txt
    ```
-3. Launch the dashboard:
+3. Launch the unified runner:
    ```bash
-   streamlit run app.py
+   python run.py
    ```
+
+The menu provides five operations: live interactive analysis, completed-scan viewer, overnight scan, neural-network training, and the complete train/scan/view workflow. For automation, select a mode directly:
+
+```bash
+python run.py live
+python run.py viewer
+python run.py scan
+python run.py train
+python run.py all
+```
+
+To enable the optional multi-agent OpenAI review without storing a key on disk:
+
+```bash
+python run.py viewer --llm
+python run.py live --llm --model gpt-5.6-sol
+```
+
+The runner automatically uses `OPENAI_API_KEY` and `OPENAI_REVIEW_MODEL` when already set. Otherwise, `--llm` opens a hidden API-key prompt for the lifetime of the runner process only.
 
 ---
 *Disclaimer: Financial markets are inherently probabilistic. Market Scanner Pro provides statistical modeling and Bayesian estimates based on historical data. It does not provide guaranteed returns or personalized financial advice.*
