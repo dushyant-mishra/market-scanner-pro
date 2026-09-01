@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 import os
+from pathlib import Path
 
 import run
 
@@ -15,6 +16,10 @@ class UnifiedRunnerTests(unittest.TestCase):
     def test_live_and_viewer_use_selected_port(self):
         self.assertIn("8765", run.command_for("live", 8765)[0])
         self.assertIn("8765", run.command_for("viewer", 8765)[0])
+
+    def test_runner_prefers_project_virtual_environment(self):
+        python = Path(run.command_for("viewer")[0][0])
+        self.assertEqual(python.resolve(), (run.ROOT / ".venv" / "Scripts" / "python.exe").resolve())
 
     def test_default_menu_choice_is_viewer(self):
         with patch("builtins.input", return_value=""):

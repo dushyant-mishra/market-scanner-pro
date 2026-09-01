@@ -185,9 +185,9 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
         if 'market_cap' in heatmap_df.columns and 'marketCap' not in heatmap_df.columns:
             heatmap_df = heatmap_df.rename(columns={'market_cap': 'marketCap'})
         heatmap_fig = charts.create_sector_heatmap(heatmap_df)
-        st.plotly_chart(heatmap_fig, use_container_width=True)
+        st.plotly_chart(heatmap_fig, width="stretch")
         risk_fig = charts.create_risk_return_chart(heatmap_df)
-        st.plotly_chart(risk_fig, use_container_width=True)
+        st.plotly_chart(risk_fig, width="stretch")
         
     st.markdown("---")
     
@@ -248,7 +248,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                         hist_df = details["hist"]
                         if isinstance(hist_df, pd.DataFrame) and not hist_df.empty and "Open" in hist_df.columns:
                             price_fig = charts.create_price_chart(hist_df, selected_ticker)
-                            st.plotly_chart(price_fig, use_container_width=True)
+                            st.plotly_chart(price_fig, width="stretch")
                         else:
                             st.info("Historical price data is not available for this ticker.")
                     
@@ -258,12 +258,12 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                     with g_col1:
                         st.plotly_chart(
                             charts.create_score_gauge(scores.get("bull_score", 50), "Bull Score"),
-                            use_container_width=True
+                            width="stretch"
                         )
                     with g_col2:
                         st.plotly_chart(
                             charts.create_score_gauge(scores.get("risk_score", 50), "Risk Score", max_val=100),
-                            use_container_width=True
+                            width="stretch"
                         )
                         
                     st.markdown("##### Category Breakdown")
@@ -284,7 +284,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                     components.render_strategy_table(strategies)
                     
                     radar_fig = charts.create_strategy_radar(strategies)
-                    st.plotly_chart(radar_fig, use_container_width=True)
+                    st.plotly_chart(radar_fig, width="stretch")
                     
                 with fcast_col:
                     st.markdown("##### Probabilistic Forecasts")
@@ -296,7 +296,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                         forecasts,
                         selected_ticker
                     )
-                    st.plotly_chart(fcast_fig, use_container_width=True)
+                    st.plotly_chart(fcast_fig, width="stretch")
                     
             with tab2:
                 st.markdown("### Bayesian-Causal Discovery & Fundamentals")

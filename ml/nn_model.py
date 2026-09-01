@@ -11,6 +11,8 @@ purpose of this project we provide a ``predict`` method that can be called
 directly from ``scoring.forecaster`` when ``config.ML_MODEL`` == "custom_nn".
 """
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -96,7 +98,13 @@ def predict(features: dict, device: str = "cpu") -> dict:
         "iv",
         "beta",
     ]
-    vector = [float(features.get(k, 0.0)) for k in feature_order]
+    vector = []
+    for key in feature_order:
+        try:
+            value = float(features.get(key, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        vector.append(value if math.isfinite(value) else 0.0)
     tensor = torch.tensor(vector, dtype=torch.float32).unsqueeze(0).to(device)
     model = _load_model(device)
     
@@ -104,11 +112,22 @@ def predict(features: dict, device: str = "cpu") -> dict:
     if _model_stats['X_mean'] is not None and _model_stats['X_std'] is not None:
         mean = _model_stats['X_mean'].to(device)
         std = _model_stats['X_std'].to(device)
-        tensor = (tensor - mean) / std
+        # Constant/near-constant training columns (currently IV and beta) do
+        # not contain enough information to standardize. Dividing them by an
+        # epsilon-sized std can turn an ordinary inference value into 1e8 and
+        # overflow the model's exponential output.
+        safe_std = torch.where(torch.abs(std) < 1e-6, torch.ones_like(std), std)
+        tensor = (tensor - mean) / safe_std
         
     with torch.no_grad():
         out = model(tensor).squeeze(0).cpu().numpy()
     bear_mul, base_mul, bull_mul = out.tolist()
+    multipliers = (bear_mul, base_mul, bull_mul)
+    if (
+        not all(math.isfinite(value) for value in multipliers)
+        or not (0.05 <= bear_mul <= base_mul <= bull_mul <= 5.0)
+    ):
+        raise ValueError(f"Invalid neural forecast multipliers: {multipliers!r}")
     return {
         "bear_multiplier": bear_mul,
         "base_multiplier": base_mul,

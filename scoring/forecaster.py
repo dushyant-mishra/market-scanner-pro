@@ -37,7 +37,7 @@ def _safe(val, default: float = 0.0) -> float:
         return default
     try:
         f = float(val)
-        return f if f == f else default
+        return f if math.isfinite(f) else default
     except (TypeError, ValueError):
         return default
 
@@ -342,15 +342,36 @@ def _forecast_single_horizon(
         # Blend with NN if available (NN is trained for 30d so we scale it for 90d)
         if nn_output is not None:
             time_scaler = np.sqrt(horizon / 30.0) if horizon != 30 else 1.0
-            
-            nn_bear_pct = (nn_output["bear_multiplier"] - 1.0) * time_scaler
-            nn_base_pct = (nn_output["base_multiplier"] - 1.0) * time_scaler
-            nn_bull_pct = (nn_output["bull_multiplier"] - 1.0) * time_scaler
-            
-            # Blend 50/50
-            bear_pct = 0.5 * bear_pct + 0.5 * nn_bear_pct
-            base_pct = 0.5 * base_pct + 0.5 * nn_base_pct
-            bull_pct = 0.5 * bull_pct + 0.5 * nn_bull_pct
+
+            try:
+                nn_multipliers = tuple(
+                    float(nn_output[key])
+                    for key in ("bear_multiplier", "base_multiplier", "bull_multiplier")
+                )
+            except (KeyError, TypeError, ValueError):
+                nn_multipliers = ()
+
+            # Neural output is optional evidence. Only blend finite, plausible,
+            # correctly ordered scenarios; otherwise retain the empirical
+            # historical-percentile forecast calculated above.
+            if (
+                len(nn_multipliers) == 3
+                and all(math.isfinite(value) for value in nn_multipliers)
+                and 0.05 <= nn_multipliers[0] <= nn_multipliers[1] <= nn_multipliers[2] <= 5.0
+            ):
+                nn_bear_pct, nn_base_pct, nn_bull_pct = (
+                    (value - 1.0) * time_scaler for value in nn_multipliers
+                )
+
+                bear_pct = 0.5 * bear_pct + 0.5 * nn_bear_pct
+                base_pct = 0.5 * base_pct + 0.5 * nn_base_pct
+                bull_pct = 0.5 * bull_pct + 0.5 * nn_bull_pct
+
+        if not (
+            all(math.isfinite(value) for value in (bear_pct, base_pct, bull_pct))
+            and bear_pct <= base_pct <= bull_pct
+        ):
+            return None
 
         # Prices
         bear_price = round(current_price * (1 + bear_pct), 2)

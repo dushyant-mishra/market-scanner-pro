@@ -139,7 +139,11 @@ def train_model():
     
     # Normalize X (Simple standard scaling for the example)
     X_mean = X_tensor.mean(dim=0, keepdim=True)
-    X_std = X_tensor.std(dim=0, keepdim=True) + 1e-8
+    X_std = X_tensor.std(dim=0, keepdim=True)
+    # Constant placeholder features (currently historical IV and beta) carry
+    # no scaling information. Store a neutral scale instead of an epsilon so
+    # future inference cannot amplify ordinary values into extreme inputs.
+    X_std = torch.where(X_std < 1e-6, torch.ones_like(X_std), X_std)
     X_scaled = (X_tensor - X_mean) / X_std
     
     model = PriceRangeNN(input_dim=12)

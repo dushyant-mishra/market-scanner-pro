@@ -256,6 +256,7 @@ def render_top5_upside_cards(df) -> None:
         bayesian_cls = _score_badge_class(bayesian * 100)
 
         sign = "+" if upside > 0 else ""
+        target_cls = "delta-positive" if upside >= 0 else "delta-negative"
         card = f"""
         <div class="metric-card top5-card {extra_cls}" style="word-break: break-word; white-space: normal;">
             <div class="ticker-name">{_esc(row.get("ticker", ""))}</div>
@@ -264,7 +265,7 @@ def render_top5_upside_cards(df) -> None:
                 <span class="score-badge {bayesian_cls}">Conviction {bayesian*100:.0f}%</span>
             </div>
             <div class="score-row" style="margin-top:2px;">
-                <span class="delta-positive" style="font-size: 0.9rem; font-weight:700;">Target: {sign}{upside:.1f}%</span>
+                <span class="{target_cls}" style="font-size: 0.9rem; font-weight:700;">90d bull scenario: {sign}{upside:.1f}%</span>
             </div>
             <div class="text-secondary" style="font-size:0.72rem; margin-top:0.3rem;">
                 Quality Score: {quality:.0f}%
@@ -546,7 +547,7 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
         st.caption(screen_results.get("note", "Fund-specific quality analysis."))
         criteria = screen_results.get("criteria", [])
         if criteria:
-            st.dataframe(pd.DataFrame(criteria), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(criteria), width="stretch", hide_index=True)
         return
     quality_score = screen_results.get("quality_score", 0)
     score_cls = _score_badge_class(quality_score)

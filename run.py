@@ -15,6 +15,18 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 
+
+def project_python() -> str:
+    """Prefer the project's environment even when the launcher uses system Python."""
+    candidates = (
+        ROOT / ".venv" / "Scripts" / "python.exe",
+        ROOT / ".venv" / "bin" / "python",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
 MODES = {
     "live": "Run a live interactive scan in Streamlit",
     "viewer": "Open a completed local or Colab scan database",
@@ -26,7 +38,7 @@ MODES = {
 
 def command_for(mode: str, port: int = 8501) -> list[list[str]]:
     """Return subprocess commands for a launcher mode (testable, no side effects)."""
-    python = sys.executable
+    python = project_python()
     streamlit = [python, "-m", "streamlit", "run"]
     commands = {
         "live": [streamlit + ["app.py", "--server.port", str(port)]],
