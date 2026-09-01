@@ -36,6 +36,13 @@ MODES = {
 }
 
 
+def valid_port(value: str) -> int:
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError("port must be between 1 and 65535")
+    return port
+
+
 def command_for(mode: str, port: int = 8501) -> list[list[str]]:
     """Return subprocess commands for a launcher mode (testable, no side effects)."""
     python = project_python()
@@ -102,7 +109,7 @@ def run_mode(mode: str, port: int = 8501) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Unified Market Scanner Pro launcher")
     parser.add_argument("mode", nargs="?", choices=MODES, help="Operation to run; omit for the menu")
-    parser.add_argument("--port", type=int, default=8501, help="Streamlit port (default: 8501)")
+    parser.add_argument("--port", type=valid_port, default=8501, help="Streamlit port (default: 8501)")
     llm_group = parser.add_mutually_exclusive_group()
     llm_group.add_argument("--llm", action="store_true", help="Enable LLM review; securely prompt if OPENAI_API_KEY is unset")
     llm_group.add_argument("--no-llm", action="store_true", help="Remove inherited API credentials and disable LLM review")

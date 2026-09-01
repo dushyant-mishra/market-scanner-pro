@@ -86,6 +86,14 @@ class NeuralForecastSafetyTests(unittest.TestCase):
     def test_regime_detector_is_seeded_for_repeatable_scans(self):
         self.assertEqual(RegimeDetector().model.random_state, 42)
 
+    def test_forecast_guardrail_blocks_multi_hundred_percent_scenario(self):
+        result = _forecast_single_horizon(
+            self.close, self.returns, 120.0, 90, 20, 50, 80,
+            "trending_up", {"rsi": 50},
+            {"bear_multiplier": 1.1, "base_multiplier": 2.0, "bull_multiplier": 4.0},
+        )
+        self.assertIsNone(result)
+
 
 if __name__ == "__main__":
     unittest.main()

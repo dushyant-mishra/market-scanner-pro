@@ -18,6 +18,7 @@ import streamlit as st
 import yfinance as yf
 
 from config import CACHE_TTL
+from data.quality import price_history_issues
 
 # 24 hour TTL for financial statements to avoid rate limits
 FINANCIALS_TTL = 86400
@@ -89,6 +90,8 @@ def get_price_history(
         if df.empty:
             return pd.DataFrame()
         df = df.reset_index()
+        if price_history_issues(df):
+            return pd.DataFrame()
         return df
     except Exception:
         return pd.DataFrame()

@@ -357,6 +357,8 @@ if run_scan:
                     "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
                     "asset_type": asset_type,
                     "index_memberships": ", ".join(index_memberships),
+                    "company_name": fundamentals.get("shortName") or fundamentals.get("longName") or ticker,
+                    "industry": fundamentals.get("industry") or "Not available",
                     "sector": sector,
                     "quality_score": quality_score,
                     "bayesian_posterior": bayesian_results["posterior_prob"],
@@ -484,7 +486,7 @@ else:
     display_df["last_price"] = display_df["last_price"].map(lambda p: f"${p:,.2f}")
     display_df["bull_score"] = display_df["bull_score"].map(lambda s: f"{s:.1f}")
     display_df["risk_score"] = display_df["risk_score"].map(lambda s: f"{s:.1f}")
-    display_df["confidence"] = display_df["confidence"].map(lambda c: f"{c:.0f}%")
+    display_df["confidence"] = display_df["confidence"].map(lambda c: f"{c:.0f}% evidence coverage")
     
     st.dataframe(
         display_df[[
@@ -556,7 +558,7 @@ else:
                     )
                 with g_col2:
                     st.plotly_chart(
-                        charts.create_score_gauge(details["scores"]["risk_score"], "Risk Score", max_val=100),
+                        charts.create_score_gauge(details["scores"]["risk_score"], "Risk Score (lower is better)", max_val=100, invert=True),
                         width="stretch"
                     )
                     

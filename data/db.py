@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import logging
+from contextlib import closing
 import pandas as pd
 from datetime import datetime
 
@@ -33,13 +34,15 @@ def init_db(db_path=DB_PATH):
             annualized_volatility REAL,
             max_drawdown REAL
             ,asset_type TEXT,
-            index_memberships TEXT
+            index_memberships TEXT,
+            company_name TEXT,
+            industry TEXT
         )
     ''')
     existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(scan_summary)")}
-    for column in ("risk_adjusted_conviction", "annualized_volatility", "max_drawdown", "asset_type", "index_memberships"):
+    for column in ("risk_adjusted_conviction", "annualized_volatility", "max_drawdown", "asset_type", "index_memberships", "company_name", "industry"):
         if column not in existing_columns:
-            column_type = "TEXT" if column in {"asset_type", "index_memberships"} else "REAL"
+            column_type = "TEXT" if column in {"asset_type", "index_memberships", "company_name", "industry"} else "REAL"
             cursor.execute(f"ALTER TABLE scan_summary ADD COLUMN {column} {column_type}")
     
     # Table for the deep-dive raw data (used by the Detailed Security Report)
@@ -126,8 +129,9 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
             INSERT OR REPLACE INTO scan_summary 
             (ticker, last_updated, last_price, bull_score, risk_score, confidence, 
              reason, bayesian_posterior, bull_pct_90, quality_score, sector, market_cap,
-             risk_adjusted_conviction, annualized_volatility, max_drawdown, asset_type, index_memberships)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             risk_adjusted_conviction, annualized_volatility, max_drawdown, asset_type, index_memberships,
+             company_name, industry)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             ticker,
             now,
@@ -145,7 +149,9 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
             summary_dict.get("annualized_volatility"),
             summary_dict.get("max_drawdown"),
             summary_dict.get("asset_type", "equity"),
-            summary_dict.get("index_memberships", "")
+            summary_dict.get("index_memberships", ""),
+            summary_dict.get("company_name", ""),
+            summary_dict.get("industry", "")
         ))
         
         # 2. Save Raw Data
@@ -172,6 +178,24 @@ def load_all_summaries(db_path=DB_PATH):
         init_db(db_path)
         conn = sqlite3.connect(db_path)
         df = pd.read_sql_query("SELECT * FROM scan_summary", conn)
+        # Enrich older Colab databases in memory from raw fundamentals so
+        # company hover context works without repeating a long scan.
+        if not df.empty and df["company_name"].fillna("").eq("").any():
+            identity = {}
+            for ticker, raw_json in conn.execute("SELECT ticker, raw_json FROM scan_raw_data"):
+                try:
+                    fundamentals = json.loads(raw_json).get("fundamentals") or {}
+                    identity[ticker] = (
+                        fundamentals.get("shortName") or fundamentals.get("longName") or ticker,
+                        fundamentals.get("industry") or "Not available",
+                    )
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    identity[ticker] = (ticker, "Not available")
+            for column, position, fallback in (("company_name", 0, ""), ("industry", 1, "Not available")):
+                df[column] = [
+                    value or identity.get(ticker, (ticker, "Not available"))[position] or fallback
+                    for ticker, value in zip(df["ticker"], df[column])
+                ]
         conn.close()
         return df
     except Exception as e:
@@ -205,7 +229,26 @@ def load_raw_data(ticker, db_path=DB_PATH):
             return raw_dict
     except Exception as e:
         logger.error(f"Failed to load raw data for {ticker}: {e}")
-    return {}
+        return {}
+
+
+def find_invalid_price_histories(db_path=DB_PATH) -> dict[str, list[str]]:
+    """Return stored tickers whose histories fail market-data integrity gates."""
+    from data.quality import price_history_issues
+
+    invalid = {}
+    try:
+        with closing(sqlite3.connect(db_path)) as conn:
+            rows = conn.execute("SELECT ticker, raw_json FROM scan_raw_data").fetchall()
+        for ticker, raw_json in rows:
+            raw = json.loads(raw_json)
+            history = json_to_df(raw.get("hist")) if isinstance(raw.get("hist"), str) else pd.DataFrame()
+            issues = price_history_issues(history)
+            if issues:
+                invalid[ticker] = issues
+    except Exception as exc:
+        logger.error("Failed to audit stored price histories: %s", exc)
+    return invalid
 
 def get_db_stats(db_path=DB_PATH):
     """Get the total number of stocks currently cached in the DB."""

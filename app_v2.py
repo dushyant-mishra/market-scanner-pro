@@ -119,6 +119,12 @@ filter_tickers_input = st.sidebar.text_input(
     key="filter_tickers_v2"
 )
 
+asset_filter = st.sidebar.selectbox(
+    "Asset class",
+    ["All", "Equities", "ETFs", "Mutual funds"],
+    help="Compare like with like; fund and equity scores use different evidence sets.",
+)
+
 st.sidebar.markdown("---")
 
 if st.sidebar.button("Load Overnight Data", type="primary"):
@@ -128,6 +134,18 @@ if st.sidebar.button("Load Overnight Data", type="primary"):
         with st.spinner("Loading stocks from database..."):
             df = db.load_all_summaries(db_path=db_path)
             if not df.empty:
+                asset_map = {"Equities": "equity", "ETFs": "etf", "Mutual funds": "mutual_fund"}
+                if asset_filter in asset_map:
+                    df = df[df["asset_type"] == asset_map[asset_filter]]
+
+                invalid_histories = db.find_invalid_price_histories(db_path=db_path)
+                invalid_visible = sorted(set(df["ticker"]) & set(invalid_histories))
+                if invalid_visible:
+                    df = df[~df["ticker"].isin(invalid_visible)]
+                    st.warning(
+                        f"Excluded {len(invalid_visible)} securities with suspect corporate-action or price-jump data: "
+                        + ", ".join(invalid_visible)
+                    )
                 # Apply Fidelity CSV filter
                 filter_set = set()
                 if fidelity_file is not None:
@@ -181,11 +199,15 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
     
     # 1. Sector Heatmap (rendered if 2 or more stocks exist)
     if len(df) >= 2:
+        st.markdown("### Sector Map")
+        st.caption("Area represents market capitalization or fund net assets; color represents Bull Score. Hover for company identity, industry, risk, quality, and scenario details.")
         heatmap_df = df.copy()
         if 'market_cap' in heatmap_df.columns and 'marketCap' not in heatmap_df.columns:
             heatmap_df = heatmap_df.rename(columns={'market_cap': 'marketCap'})
         heatmap_fig = charts.create_sector_heatmap(heatmap_df)
         st.plotly_chart(heatmap_fig, width="stretch")
+        st.markdown("### Composite Risk Score vs. Bull Score")
+        st.caption("The preferred signal region is upper-left: a higher Bull Score with lower modeled risk. These are scanner scores, not probabilities or expected returns.")
         risk_fig = charts.create_risk_return_chart(heatmap_df)
         st.plotly_chart(risk_fig, width="stretch")
         
@@ -262,7 +284,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                         )
                     with g_col2:
                         st.plotly_chart(
-                            charts.create_score_gauge(scores.get("risk_score", 50), "Risk Score", max_val=100),
+                            charts.create_score_gauge(scores.get("risk_score", 50), "Risk Score (lower is better)", max_val=100, invert=True),
                             width="stretch"
                         )
                         

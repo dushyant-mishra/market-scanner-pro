@@ -425,7 +425,9 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     if "market_cap" in df.columns and "marketCap" not in df.columns:
         df = df.rename(columns={"market_cap": "marketCap"})
 
-    defaults = {"sector": "Other", "ticker": "Unknown", "bull_score": 50.0,
+    defaults = {"sector": "Other", "ticker": "Unknown", "company_name": "Not available",
+                "industry": "Not available", "asset_type": "equity", "bull_score": 50.0,
+                "risk_score": 50.0, "quality_score": 0.0, "bull_pct_90": 0.0,
                 "marketCap": 1e9, "last_price": 0.0}
     for column, default in defaults.items():
         if column not in df:
@@ -435,11 +437,15 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     df["sector"] = df["sector"].fillna("Other").astype(str).str.strip()
     df["sector"] = df["sector"].replace({"": "Other", "None": "Other", "nan": "Other", "N/A": "Other"})
     df["ticker"] = df["ticker"].fillna("Unknown").astype(str).str.strip()
+    for column in ("company_name", "industry", "asset_type"):
+        df[column] = df[column].fillna("Not available").astype(str).str.strip().replace("", "Not available")
     
     # Ensure numeric columns are strictly numeric and contain no NaNs
     df["bull_score"] = pd.to_numeric(df["bull_score"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(50.0).clip(0, 100)
     df["marketCap"] = pd.to_numeric(df["marketCap"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(1e9)
     df["last_price"] = pd.to_numeric(df["last_price"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(0.0)
+    for column in ("risk_score", "quality_score", "bull_pct_90"):
+        df[column] = pd.to_numeric(df[column], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(0.0)
     
     # Keep only rows with positive market cap (required by Plotly treemap)
     df = df[df["marketCap"] > 0]
@@ -461,6 +467,7 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
             [1.0, COLORS["bullish"]],
         ],
         range_color=[0, 100],
+        custom_data=["company_name", "industry", "asset_type", "last_price", "risk_score", "quality_score", "bull_pct_90"],
     )
     
     # ------------------------------------------------------------------
@@ -513,8 +520,15 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
         texttemplate="<b>%{label}</b><br>%{color:.0f}",
         hovertemplate=(
             "<b>%{label}</b><br>"
+            "%{customdata[0]}<br>"
+            "Industry: %{customdata[1]}<br>"
+            "Asset type: %{customdata[2]}<br>"
+            "Last price: $%{customdata[3]:,.2f}<br>"
             "Bull Score: %{color:.1f}<br>"
-            "Market Cap: $%{value:,.0f}<br>"
+            "Risk Score: %{customdata[4]:.1f}<br>"
+            "Quality Score: %{customdata[5]:.1f}<br>"
+            "90d bull scenario: %{customdata[6]:+.1f}%<br>"
+            "Market cap / net assets: $%{value:,.0f}<br>"
             "<extra></extra>"
         )
     )
@@ -561,6 +575,13 @@ def create_risk_return_chart(df: pd.DataFrame) -> go.Figure:
     if "sector" not in clean:
         clean["sector"] = "Other"
     clean["sector"] = clean["sector"].fillna("Other")
+    for column, default in (("company_name", "Not available"), ("industry", "Not available"),
+                            ("asset_type", "equity"), ("quality_score", 0.0),
+                            ("bull_pct_90", 0.0), ("annualized_volatility", 0.0),
+                            ("max_drawdown", 0.0)):
+        if column not in clean:
+            clean[column] = default
+        clean[column] = clean[column].fillna(default)
 
     fig = px.scatter(
         clean,
@@ -569,12 +590,19 @@ def create_risk_return_chart(df: pd.DataFrame) -> go.Figure:
         size="marketCap",
         color="sector",
         hover_name="ticker",
+        hover_data={"company_name": True, "industry": True, "asset_type": True,
+                    "quality_score": ":.1f", "bull_pct_90": ":+.1f",
+                    "annualized_volatility": ":.1%", "max_drawdown": ":.1%",
+                    "marketCap": False},
         size_max=45,
-        labels={"risk_score": "Risk Score (lower is better)", "bull_score": "Bull Score"},
-        title="Risk vs. Conviction",
+        labels={"risk_score": "Risk Score (lower is better)", "bull_score": "Bull Score",
+                "company_name": "Company", "industry": "Industry", "asset_type": "Asset class",
+                "quality_score": "Quality Score", "bull_pct_90": "90d bull scenario",
+                "annualized_volatility": "Annualized volatility", "max_drawdown": "Maximum drawdown"},
+        title="Composite Risk Score vs. Bull Score",
     )
-    fig.add_vline(x=55, line_dash="dot", line_color=COLORS["warning"])
-    fig.add_hline(y=60, line_dash="dot", line_color=COLORS["accent"])
+    fig.add_vline(x=55, line_dash="dot", line_color=COLORS["warning"], annotation_text="Higher modeled risk →")
+    fig.add_hline(y=60, line_dash="dot", line_color=COLORS["accent"], annotation_text="Higher bull signal ↑")
     base = get_chart_layout()
     base.update(height=430, margin=dict(l=8, r=8, t=50, b=8))
     fig.update_layout(**base)
@@ -677,7 +705,7 @@ def create_strategy_radar(strategies: list[dict]) -> go.Figure:
 # ------------------------------------------------------------------
 
 def create_score_gauge(
-    score: float, label: str, max_val: float = 100
+    score: float, label: str, max_val: float = 100, invert: bool = False
 ) -> go.Figure:
     """Compact gauge chart for a single score value.
 
@@ -690,9 +718,10 @@ def create_score_gauge(
     max_val : float
         Upper bound of the gauge range.
     """
-    if score > 70:
+    color_score = max_val - score if invert else score
+    if color_score > 70:
         bar_color = COLORS["bullish"]
-    elif score > 40:
+    elif color_score > 40:
         bar_color = COLORS["neutral"]
     else:
         bar_color = COLORS["bearish"]
@@ -717,9 +746,9 @@ def create_score_gauge(
                 bgcolor=COLORS["bg_card"],
                 borderwidth=0,
                 steps=[
-                    dict(range=[0, 40], color="rgba(255,71,87,0.12)"),
+                    dict(range=[0, 40], color="rgba(0,212,170,0.12)" if invert else "rgba(255,71,87,0.12)"),
                     dict(range=[40, 70], color="rgba(255,165,2,0.10)"),
-                    dict(range=[70, max_val], color="rgba(0,212,170,0.10)"),
+                    dict(range=[70, max_val], color="rgba(255,71,87,0.12)" if invert else "rgba(0,212,170,0.10)"),
                 ],
                 threshold=dict(
                     line=dict(color="#ffffff", width=2),

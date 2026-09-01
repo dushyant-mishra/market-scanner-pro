@@ -128,7 +128,7 @@ class RegimeDetector:
         # Assign labels: highest volatility -> high_volatility, then based on mean
         labels = []
         for i, st in enumerate(stats):
-            if i == 0:
+            if i == 0 and st["std"] * _ANNUALIZATION >= 0.35:
                 labels.append("high_volatility")
             else:
                 if st["mean"] >= 0:
@@ -372,7 +372,7 @@ def _forecast_single_horizon(
         else:
             vol_ratio = 1.0
 
-        vol_adj = max(vol_ratio, 0.8)  # don't narrow below 0.8×
+        vol_adj = min(max(vol_ratio, 0.8), 1.5)
 
         # 3. RSI mean-reversion adjustment
         rsi = _safe(technical.get("rsi")) if technical else 50
@@ -420,6 +420,15 @@ def _forecast_single_horizon(
             and bear_pct <= base_pct <= bull_pct
         ):
             return None
+
+        # Prevent short, overlapping samples from becoming economically
+        # nonsensical multi-hundred-percent point scenarios.
+        max_gain = 0.75 if horizon <= 30 else 1.00
+        if bull_pct > max_gain:
+            return None
+        bear_pct = min(max(bear_pct, -0.95), max_gain)
+        base_pct = min(max(base_pct, bear_pct), max_gain)
+        bull_pct = max(bull_pct, base_pct)
 
         # Prices
         bear_price = round(current_price * (1 + bear_pct), 2)

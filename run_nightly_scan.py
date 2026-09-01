@@ -194,6 +194,8 @@ def run_nightly_scan():
                 "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
                 "asset_type": asset_type,
                 "index_memberships": ", ".join(index_memberships),
+                "company_name": fundamentals.get("shortName") or fundamentals.get("longName") or ticker,
+                "industry": fundamentals.get("industry") or "Not available",
                 "sector": sector,
                 "quality_score": quality_score,
                 "bayesian_posterior": bayesian_results["posterior_prob"],

@@ -537,7 +537,7 @@ def _compute_confidence(
     valid_features = 0
 
     # Check key fundamentals
-    fund_keys = ["pe_ratio", "forward_pe", "revenue_growth", "profit_margin", "analyst_rating"]
+    fund_keys = ["trailingPE", "forwardPE", "revenueGrowth", "profitMargins", "recommendationMean"]
     if fundamentals:
         for k in fund_keys:
             total_features += 1

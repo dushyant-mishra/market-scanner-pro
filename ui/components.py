@@ -156,7 +156,7 @@ def render_score_card(
         </div>
         <div style="margin-top:0.3rem; display:flex; align-items:center; gap:6px;">
             <span class="text-secondary" style="font-size:0.8rem;">
-                Confidence:
+                Evidence coverage:
             </span>
             <span style="color:#fff; font-size:0.85rem; font-weight:600;">
                 {confidence:.0f}%
@@ -212,7 +212,7 @@ def render_top5_cards(df, category: str) -> None:
                 <span class="score-badge {risk_cls}">Risk {risk:.0f}</span>
             </div>
             <div class="text-secondary" style="font-size:0.72rem; margin-top:0.3rem;">
-                Confidence: {conf:.0f}%
+                Evidence coverage: {conf:.0f}%
             </div>
             {reason_html}
         </div>
@@ -402,7 +402,7 @@ def render_forecast_card(forecast: dict) -> None:
             </div>
 
             <div style="margin-top:0.5rem; font-size:0.75rem;" class="text-secondary">
-                Confidence: <span class="fw-bold" style="color:#fff;">{confidence:.0f}%</span>
+                Evidence coverage: <span class="fw-bold" style="color:#fff;">{confidence:.0f}%</span>
                 &nbsp;·&nbsp; Regime: <span style="color:#fff;">{regime}</span>
             </div>
         </div>

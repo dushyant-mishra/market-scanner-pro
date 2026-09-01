@@ -21,6 +21,11 @@ class UnifiedRunnerTests(unittest.TestCase):
         python = Path(run.command_for("viewer")[0][0])
         self.assertEqual(python.resolve(), (run.ROOT / ".venv" / "Scripts" / "python.exe").resolve())
 
+    def test_port_validation_rejects_invalid_values(self):
+        for value in ("0", "65536", "-1"):
+            with self.assertRaises(Exception):
+                run.valid_port(value)
+
     def test_default_menu_choice_is_viewer(self):
         with patch("builtins.input", return_value=""):
             self.assertEqual(run.choose_mode(), "viewer")

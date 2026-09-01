@@ -11,6 +11,8 @@ class ChartTests(unittest.TestCase):
         self.frame = pd.DataFrame(
             {
                 "ticker": ["AAA", "BBB", "CCC"],
+                "company_name": ["Alpha Corp", "Beta Inc", "Gamma Ltd"],
+                "industry": ["Software", "Hardware", "Services"],
                 "sector": ["Tech", "Tech", None],
                 "marketCap": [2e9, 1e9, None],
                 "last_price": [100, None, 30],
@@ -25,12 +27,21 @@ class ChartTests(unittest.TestCase):
         for color in fig.data[0].marker.colors:
             self.assertIsNotNone(color)
             self.assertFalse(isinstance(color, float) and math.isnan(color))
+        self.assertIn("Alpha Corp", str(fig.data[0].customdata))
 
     def test_risk_return_chart_sanitizes_missing_values(self):
         fig = create_risk_return_chart(self.frame)
         self.assertTrue(fig.data)
         self.assertEqual(fig.layout.xaxis.range, (0, 100))
         self.assertEqual(fig.layout.yaxis.range, (0, 100))
+        self.assertIn("Alpha Corp", str(fig.data[0].customdata))
+
+    def test_risk_gauge_inverts_color_polarity(self):
+        from ui.charts import create_score_gauge
+        low = create_score_gauge(20, "Risk", invert=True)
+        high = create_score_gauge(80, "Risk", invert=True)
+        self.assertEqual(low.data[0].gauge.bar.color, "#00d4aa")
+        self.assertEqual(high.data[0].gauge.bar.color, "#ff4757")
 
     def test_heatmap_accepts_empty_legacy_frame(self):
         fig = create_sector_heatmap(pd.DataFrame())
