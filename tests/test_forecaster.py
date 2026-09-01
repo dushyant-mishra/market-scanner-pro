@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 
 from ml import nn_model
-from scoring.forecaster import _forecast_single_horizon
+from scoring.forecaster import RegimeDetector, _forecast_single_horizon, _probability_above_from_quantiles
 
 
 class NeuralForecastSafetyTests(unittest.TestCase):
@@ -73,6 +73,18 @@ class NeuralForecastSafetyTests(unittest.TestCase):
                     nn_model.predict({})
         finally:
             nn_model._model_stats = old_stats
+
+    def test_probability_agrees_with_negative_median_scenario(self):
+        probability = _probability_above_from_quantiles(-0.2007, -0.1149, 0.0285, 20, 50, 80)
+        self.assertLess(probability, 0.5)
+        self.assertAlmostEqual(probability, 0.2596, places=3)
+
+    def test_probability_agrees_with_positive_median_scenario(self):
+        probability = _probability_above_from_quantiles(-0.10, 0.05, 0.20, 20, 50, 80)
+        self.assertGreater(probability, 0.5)
+
+    def test_regime_detector_is_seeded_for_repeatable_scans(self):
+        self.assertEqual(RegimeDetector().model.random_state, 42)
 
 
 if __name__ == "__main__":

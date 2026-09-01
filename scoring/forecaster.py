@@ -15,8 +15,6 @@ from typing import Dict
 # HMM for regime detection
 from hmmlearn.hmm import GaussianHMM
 import numpy as np
-
-import numpy as np
 import pandas as pd
 
 from config import FORECAST_HORIZONS, FORECAST_PERCENTILES, ML_MODEL
@@ -42,6 +40,51 @@ def _safe(val, default: float = 0.0) -> float:
         return default
 
 
+def _probability_above_from_quantiles(
+    bear_return: float,
+    base_return: float,
+    bull_return: float,
+    bear_percentile: float,
+    base_percentile: float,
+    bull_percentile: float,
+) -> float:
+    """Estimate P(return > 0) from the final displayed forecast quantiles.
+
+    Linear interpolation between adjacent quantile anchors keeps the displayed
+    probability directionally consistent with the displayed bear/base/bull
+    scenarios. Tail estimates are conservatively bounded to 5%-95%.
+    """
+    returns = (bear_return, base_return, bull_return)
+    if not all(math.isfinite(value) for value in returns):
+        return 0.5
+    if not bear_return <= base_return <= bull_return:
+        return 0.5
+
+    quantiles = tuple(value / 100.0 for value in (bear_percentile, base_percentile, bull_percentile))
+    if not 0.0 < quantiles[0] < quantiles[1] < quantiles[2] < 1.0:
+        return 0.5
+
+    if bear_return == bull_return:
+        return 0.95 if bull_return > 0 else 0.05 if bull_return < 0 else 0.5
+
+    if 0.0 <= bear_return:
+        left_x, right_x = bear_return, base_return
+        left_q, right_q = quantiles[0], quantiles[1]
+    elif 0.0 <= base_return:
+        left_x, right_x = bear_return, base_return
+        left_q, right_q = quantiles[0], quantiles[1]
+    elif 0.0 <= bull_return:
+        left_x, right_x = base_return, bull_return
+        left_q, right_q = quantiles[1], quantiles[2]
+    else:
+        left_x, right_x = base_return, bull_return
+        left_q, right_q = quantiles[1], quantiles[2]
+
+    width = right_x - left_x
+    cdf_at_zero = left_q if width <= 1e-12 else left_q + (right_q - left_q) * ((0.0 - left_x) / width)
+    return min(max(1.0 - cdf_at_zero, 0.05), 0.95)
+
+
 class RegimeDetector:
     """Detect market regime using a Gaussian Hidden Markov Model.
 
@@ -54,7 +97,12 @@ class RegimeDetector:
 
     def __init__(self, n_states: int = 3):
         self.n_states = n_states
-        self.model = GaussianHMM(n_components=n_states, covariance_type="diag", n_iter=1000)
+        self.model = GaussianHMM(
+            n_components=n_states,
+            covariance_type="diag",
+            n_iter=1000,
+            random_state=42,
+        )
         self.state_labels: list[str] = []
 
     def fit(self, returns: pd.Series) -> None:
@@ -378,11 +426,17 @@ def _forecast_single_horizon(
         base_price = round(current_price * (1 + base_pct), 2)
         bull_price = round(current_price * (1 + bull_pct), 2)
 
-        # Probability of being above current price
-        # Use simple empirical CDF at return = 0
-        prob_above = float((rolling_returns > 0).sum() / len(rolling_returns))
-        # Adjust with our bias terms
-        prob_above = min(max(prob_above + trend_adj + rsi_adj, 0.05), 0.95)
+        # Derive the probability from the same final quantiles displayed to
+        # users. The old empirical probability was calculated before the NN
+        # blend, allowing a negative median forecast to claim 77%-90% upside.
+        prob_above = _probability_above_from_quantiles(
+            bear_pct,
+            base_pct,
+            bull_pct,
+            bear_pctile,
+            base_pctile,
+            bull_pctile,
+        )
 
         return {
             "bear_pct": round(bear_pct, 4),

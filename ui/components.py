@@ -387,7 +387,7 @@ def render_forecast_card(forecast: dict) -> None:
 
             <div style="margin-top:0.7rem;">
                 <span class="text-secondary" style="font-size:0.78rem;">
-                    Prob. above current:
+                    Scenario-implied prob. above current:
                 </span>
                 <span style="color:#fff; font-weight:600; font-size:0.85rem;">
                     {prob_above:.0f}%
