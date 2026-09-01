@@ -57,8 +57,12 @@ def choose_mode() -> str:
         print("Please enter a number from 1 to 5.")
 
 
-def configure_llm(enable: bool, model: str | None = None) -> bool:
+def configure_llm(enable: bool, model: str | None = None, disable: bool = False) -> bool:
     """Configure optional LLM review for child processes without persisting secrets."""
+    if disable:
+        os.environ.pop("OPENAI_API_KEY", None)
+        os.environ.pop("OPENAI_REVIEW_MODEL", None)
+        return False
     if model:
         os.environ["OPENAI_REVIEW_MODEL"] = model
     if os.getenv("OPENAI_API_KEY"):
@@ -87,16 +91,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Unified Market Scanner Pro launcher")
     parser.add_argument("mode", nargs="?", choices=MODES, help="Operation to run; omit for the menu")
     parser.add_argument("--port", type=int, default=8501, help="Streamlit port (default: 8501)")
-    parser.add_argument("--llm", action="store_true", help="Enable LLM review; securely prompt if OPENAI_API_KEY is unset")
+    llm_group = parser.add_mutually_exclusive_group()
+    llm_group.add_argument("--llm", action="store_true", help="Enable LLM review; securely prompt if OPENAI_API_KEY is unset")
+    llm_group.add_argument("--no-llm", action="store_true", help="Remove inherited API credentials and disable LLM review")
     parser.add_argument("--model", help="OpenAI review model (or set OPENAI_REVIEW_MODEL)")
     args = parser.parse_args(argv)
     menu_mode = args.mode is None
     mode = args.mode or choose_mode()
     enable_llm = args.llm
-    if menu_mode and mode in {"live", "viewer", "all"} and not os.getenv("OPENAI_API_KEY"):
+    if menu_mode and not args.no_llm and mode in {"live", "viewer", "all"} and not os.getenv("OPENAI_API_KEY"):
         answer = input("Enable optional multi-agent LLM review? [y/N]: ").strip().lower()
         enable_llm = answer in {"y", "yes"}
-    llm_ready = configure_llm(enable_llm, args.model)
+    llm_ready = configure_llm(enable_llm, args.model, disable=args.no_llm)
     print(f"LLM review: {'enabled' if llm_ready else 'disabled'}")
     try:
         return run_mode(mode, args.port)

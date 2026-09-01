@@ -37,6 +37,16 @@ class UnifiedRunnerTests(unittest.TestCase):
             self.assertTrue(run.configure_llm(True))
             self.assertEqual(os.environ["OPENAI_API_KEY"], "secret")
 
+    def test_no_llm_removes_inherited_credentials(self):
+        with patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "inherited", "OPENAI_REVIEW_MODEL": "model"},
+            clear=True,
+        ):
+            self.assertFalse(run.configure_llm(False, disable=True))
+            self.assertNotIn("OPENAI_API_KEY", os.environ)
+            self.assertNotIn("OPENAI_REVIEW_MODEL", os.environ)
+
 
 if __name__ == "__main__":
     unittest.main()

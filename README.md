@@ -119,5 +119,17 @@ python run.py live --llm --model gpt-5.6-sol
 
 The runner automatically uses `OPENAI_API_KEY` and `OPENAI_REVIEW_MODEL` when already set. Otherwise, `--llm` opens a hidden API-key prompt for the lifetime of the runner process only.
 
+To explicitly remove inherited API credentials from the runner and its dashboard process:
+
+```bash
+python run.py viewer --no-llm
+```
+
+Prompted keys are never persisted and disappear when the runner exits. On Windows, if a key was previously stored permanently in the user environment, remove it with PowerShell and then open a new terminal:
+
+```powershell
+[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", $null, "User")
+```
+
 ---
 *Disclaimer: Financial markets are inherently probabilistic. Market Scanner Pro provides statistical modeling and Bayesian estimates based on historical data. It does not provide guaranteed returns or personalized financial advice.*
