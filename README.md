@@ -73,6 +73,10 @@ The interactive scanner includes built-in **Fidelity Mutual Funds** and **Fideli
 
 For the larger third-party FundsNetwork catalog, export current results from Fidelity's mutual-fund screener and select **Fidelity Fund Screener Export** in the sidebar. Availability, transaction fees, minimums, and share classes can change, so the imported Fidelity export should be treated as the source of truth. Unverified Yahoo expense-ratio fields are deliberately excluded from quality scoring.
 
+### PHLX US AI Semiconductor Index
+
+The interactive and nightly scanners include an explicit **PHLX AI Semiconductor (ASOX)** universe. Results retain ASOX membership for peer comparison and LLM review. The built-in basket is dated because Nasdaq reconstitutes ASOX semi-annually; refresh it after the March and September effective dates.
+
 ---
 
 ## Installation & Usage

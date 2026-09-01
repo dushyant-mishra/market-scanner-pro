@@ -35,6 +35,16 @@ FIDELITY_ETFS: list[str] = [
     "FFDI", "FFGX", "FFEM", "FBTC",
 ]
 
+# PHLX US AI Semiconductor Index (ASOX) equity basket observed 2026-08-29.
+# Nasdaq reconstitutes the index semi-annually; update this dated snapshot after
+# the March and September effective dates.
+ASOX_CONSTITUENTS_AS_OF = "2026-08-29"
+ASOX_TICKERS: list[str] = [
+    "ACMR", "AMD", "AMKR", "AMAT", "ARM", "ASML", "AVGO", "CDNS",
+    "KLAC", "LRCX", "LSCC", "MRVL", "NVDA", "QCOM", "RMBS", "SNPS",
+    "TER", "TSM",
+]
+
 ASSET_TYPE_OVERRIDES = {
     **{ticker: "mutual_fund" for ticker in FIDELITY_MUTUAL_FUNDS},
     **{ticker: "etf" for ticker in FIDELITY_ETFS},
@@ -472,6 +482,7 @@ def get_universe(name: str) -> list[str]:
         "default": DEFAULT_TICKERS,
         "fidelity_mutual_funds": FIDELITY_MUTUAL_FUNDS,
         "fidelity_etfs": FIDELITY_ETFS,
+        "asox": ASOX_TICKERS,
     }
 
     key = name.strip().lower()
@@ -481,6 +492,15 @@ def get_universe(name: str) -> list[str]:
             f"Valid options: {sorted(_universes.keys())}"
         )
     return _universes[key]
+
+
+def get_index_memberships(ticker: str) -> list[str]:
+    """Return explicit thematic/index memberships tracked by this project."""
+    symbol = str(ticker).strip().upper()
+    memberships = []
+    if symbol in ASOX_TICKERS:
+        memberships.append("PHLX US AI Semiconductor (ASOX)")
+    return memberships
 
 
 def get_asset_type(ticker: str, quote_type: str | None = None) -> str:

@@ -56,7 +56,7 @@ st.sidebar.title("Scanner Configuration")
 # Universe selector
 universe_names = st.sidebar.multiselect(
     "Select Ticker Universes",
-    options=["Default", "S&P 500", "Nasdaq 100", "Top Options", "Fidelity Mutual Funds", "Fidelity ETFs", "Fidelity Fund Screener Export", "Fidelity Portfolio", "Custom"],
+    options=["Default", "S&P 500", "Nasdaq 100", "PHLX AI Semiconductor (ASOX)", "Top Options", "Fidelity Mutual Funds", "Fidelity ETFs", "Fidelity Fund Screener Export", "Fidelity Portfolio", "Custom"],
     default=["S&P 500", "Nasdaq 100"],
     key="sb_universe"
 )
@@ -69,6 +69,7 @@ universe_key_map = {
     "Top Options": "top_liquid",
     "Fidelity Mutual Funds": "fidelity_mutual_funds",
     "Fidelity ETFs": "fidelity_etfs",
+    "PHLX AI Semiconductor (ASOX)": "asox",
 }
 
 default_text_list = []
@@ -190,6 +191,7 @@ if run_scan:
                 # 2. Fetch fundamentals and option aggregates
                 fundamentals = fetcher.get_fundamentals(ticker)
                 asset_type = universe.get_asset_type(ticker, fundamentals.get("quoteType"))
+                index_memberships = universe.get_index_memberships(ticker)
                 options_data = fetcher.get_options_data(ticker) if asset_type != "mutual_fund" else {}
                 earnings_date = fetcher.get_earnings_date(ticker) if asset_type == "equity" else None
                 
@@ -319,6 +321,7 @@ if run_scan:
                 st.session_state.scan_raw[ticker] = {
                     "price_features": price_features,
                     "asset_type": asset_type,
+                    "index_memberships": index_memberships,
                     "fundamentals": fundamentals,
                     "options_data": options_data,
                     "technical": tech_indicators,
@@ -353,6 +356,7 @@ if run_scan:
                     "reason": scores["reasons"][0] if scores.get("reasons") else "No strong signals",
                     "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
                     "asset_type": asset_type,
+                    "index_memberships": ", ".join(index_memberships),
                     "sector": sector,
                     "quality_score": quality_score,
                     "bayesian_posterior": bayesian_results["posterior_prob"],

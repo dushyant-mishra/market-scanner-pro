@@ -14,8 +14,8 @@ from datetime import datetime
 # Import internal modules
 from data import fetcher
 from data.universe import (
-    SECTOR_MAP, FIDELITY_ETFS, FIDELITY_MUTUAL_FUNDS,
-    get_sector_etf, get_asset_type,
+    SECTOR_MAP, FIDELITY_ETFS, FIDELITY_MUTUAL_FUNDS, ASOX_TICKERS,
+    get_sector_etf, get_asset_type, get_index_memberships,
 )
 from data.db import init_db, save_stock_result
 from indicators import technical, pattern_recognition
@@ -75,7 +75,7 @@ def run_nightly_scan():
     logger.info("Initializing SQLite Database...")
     init_db()
     
-    tickers = sorted(set(get_russell_3000_tickers() + FIDELITY_MUTUAL_FUNDS + FIDELITY_ETFS))
+    tickers = sorted(set(get_russell_3000_tickers() + FIDELITY_MUTUAL_FUNDS + FIDELITY_ETFS + ASOX_TICKERS))
     logger.info(f"Loaded {len(tickers)} tickers for overnight scanning.")
     
     # Pre-fetch SPY for causal model
@@ -98,6 +98,7 @@ def run_nightly_scan():
             # 2. Fetch fundamentals and option aggregates
             fundamentals = fetcher.get_fundamentals(ticker)
             asset_type = get_asset_type(ticker, fundamentals.get("quoteType"))
+            index_memberships = get_index_memberships(ticker)
             options_data = fetcher.get_options_data(ticker) if asset_type != "mutual_fund" else {}
             
             income_stmt, balance_sheet = fetcher.get_financials_statements(ticker) if asset_type == "equity" else (pd.DataFrame(), pd.DataFrame())
@@ -192,6 +193,7 @@ def run_nightly_scan():
                 "reason": scores["reasons"][0] if scores.get("reasons") else "No strong signals",
                 "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
                 "asset_type": asset_type,
+                "index_memberships": ", ".join(index_memberships),
                 "sector": sector,
                 "quality_score": quality_score,
                 "bayesian_posterior": bayesian_results["posterior_prob"],
@@ -205,6 +207,7 @@ def run_nightly_scan():
             raw_dict = {
                 "price_features": price_features,
                 "asset_type": asset_type,
+                "index_memberships": index_memberships,
                 "fundamentals": fundamentals,
                 "options_data": options_data,
                 "technical": tech_indicators,

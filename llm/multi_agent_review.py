@@ -67,6 +67,7 @@ def build_review_context(ticker: str, details: dict) -> dict:
         {
             "ticker": ticker,
             "asset_type": details.get("asset_type", "equity"),
+            "index_memberships": details.get("index_memberships", []),
             "as_of": details.get("as_of"),
             "price_features": details.get("price_features", {}),
             "technical": details.get("technical", {}),

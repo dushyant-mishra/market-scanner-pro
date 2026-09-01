@@ -32,13 +32,14 @@ def init_db(db_path=DB_PATH):
             risk_adjusted_conviction REAL,
             annualized_volatility REAL,
             max_drawdown REAL
-            ,asset_type TEXT
+            ,asset_type TEXT,
+            index_memberships TEXT
         )
     ''')
     existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(scan_summary)")}
-    for column in ("risk_adjusted_conviction", "annualized_volatility", "max_drawdown", "asset_type"):
+    for column in ("risk_adjusted_conviction", "annualized_volatility", "max_drawdown", "asset_type", "index_memberships"):
         if column not in existing_columns:
-            column_type = "TEXT" if column == "asset_type" else "REAL"
+            column_type = "TEXT" if column in {"asset_type", "index_memberships"} else "REAL"
             cursor.execute(f"ALTER TABLE scan_summary ADD COLUMN {column} {column_type}")
     
     # Table for the deep-dive raw data (used by the Detailed Security Report)
@@ -125,8 +126,8 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
             INSERT OR REPLACE INTO scan_summary 
             (ticker, last_updated, last_price, bull_score, risk_score, confidence, 
              reason, bayesian_posterior, bull_pct_90, quality_score, sector, market_cap,
-             risk_adjusted_conviction, annualized_volatility, max_drawdown, asset_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             risk_adjusted_conviction, annualized_volatility, max_drawdown, asset_type, index_memberships)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             ticker,
             now,
@@ -143,7 +144,8 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
             summary_dict.get("risk_adjusted_conviction", 0.0),
             summary_dict.get("annualized_volatility"),
             summary_dict.get("max_drawdown"),
-            summary_dict.get("asset_type", "equity")
+            summary_dict.get("asset_type", "equity"),
+            summary_dict.get("index_memberships", "")
         ))
         
         # 2. Save Raw Data
