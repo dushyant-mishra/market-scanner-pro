@@ -9,3 +9,4 @@ statsmodels
 hmmlearn
 lxml
 scikit-learn
+openai-agents

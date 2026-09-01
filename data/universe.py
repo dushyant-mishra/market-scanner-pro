@@ -10,6 +10,36 @@ from __future__ import annotations
 
 from config import DEFAULT_TICKERS
 
+# Curated Fidelity-managed retail funds. The Fidelity screener/export remains
+# the source of truth for availability, share class, fees, and minimums.
+FIDELITY_MUTUAL_FUNDS: list[str] = [
+    "FXAIX", "FSKAX", "FSMAX", "FSPGX", "FSMDX", "FSSNX", "FSPSX",
+    "FTIHX", "FSIXX", "FXNAX", "FIPDX", "FSGGX", "FZROX", "FZILX",
+    "FNILX", "FZIPX", "FCNTX", "FDGRX", "FBGRX", "FOCPX", "FLPSX",
+    "FAGIX", "FASMX", "FFNOX", "FDEWX", "FDEEX", "FDEGX",
+    "FIKFX", "FBALX", "FGRIX", "FSPTX", "FSHCX", "FSENX",
+]
+
+# Fidelity-branded exchange-traded products listed in Fidelity's official ETF
+# catalog. Kept explicit so changes are reviewable and reproducible.
+FIDELITY_ETFS: list[str] = [
+    "ONEQ", "FTEC", "FHLC", "FENY", "FNCL", "FDIS", "FSTA", "FCOM",
+    "FIDU", "FMAT", "FUTY", "FREL", "FQAL", "FDMO", "FVAL", "FDLO",
+    "FDVV", "FDRR", "FIDI", "FDEV", "FDEM", "FLRG", "FSMD", "FCPI",
+    "FLDR", "FBND", "FCOR", "FIGB", "FLTB", "FTBD", "FDHY", "FSYD",
+    "FPFD", "FSEC", "FSTB", "FIMU", "FMUB", "FMUN", "FAAA", "FCLO",
+    "FBCG", "FBCV", "FMAG", "FPRO", "FREI", "FBOT", "FDCF", "FDIF",
+    "FDFF", "FMED", "FDTX", "FDIG", "FRNW", "FCLD", "FDRV", "FMET",
+    "FELC", "FELV", "FELG", "FMDE", "FESM", "FENI", "FYEE", "FEAC",
+    "FEMR", "FLDB", "FBUF", "FHEQ", "FFLG", "FFLV", "FFSM", "FFLC",
+    "FFDI", "FFGX", "FFEM", "FBTC",
+]
+
+ASSET_TYPE_OVERRIDES = {
+    **{ticker: "mutual_fund" for ticker in FIDELITY_MUTUAL_FUNDS},
+    **{ticker: "etf" for ticker in FIDELITY_ETFS},
+}
+
 # =====================================================================
 # S&P 500 Tickers  (as of mid-2026, ~503 symbols)
 # Grouped alphabetically for easy maintenance.
@@ -440,6 +470,8 @@ def get_universe(name: str) -> list[str]:
         "nasdaq100": NASDAQ100_TICKERS,
         "top_liquid": TOP_LIQUID_OPTIONS,
         "default": DEFAULT_TICKERS,
+        "fidelity_mutual_funds": FIDELITY_MUTUAL_FUNDS,
+        "fidelity_etfs": FIDELITY_ETFS,
     }
 
     key = name.strip().lower()
@@ -449,6 +481,21 @@ def get_universe(name: str) -> list[str]:
             f"Valid options: {sorted(_universes.keys())}"
         )
     return _universes[key]
+
+
+def get_asset_type(ticker: str, quote_type: str | None = None) -> str:
+    """Return equity, etf, or mutual_fund using catalog and provider metadata."""
+    symbol = str(ticker).strip().upper()
+    if symbol in ASSET_TYPE_OVERRIDES:
+        return ASSET_TYPE_OVERRIDES[symbol]
+    normalized = str(quote_type or "").strip().lower().replace(" ", "")
+    if normalized in {"etf", "etp"}:
+        return "etf"
+    if normalized in {"mutualfund", "mutual_fund"}:
+        return "mutual_fund"
+    if len(symbol) == 5 and symbol.endswith("X"):
+        return "mutual_fund"
+    return "equity"
 
 
 def parse_fidelity_positions_csv(file_obj) -> list[str]:
@@ -508,6 +555,38 @@ def parse_fidelity_positions_csv(file_obj) -> list[str]:
     except Exception:
         return []
 
+
+def parse_fidelity_fund_screener_csv(file_obj) -> list[str]:
+    """Extract mutual-fund/ETF symbols from a Fidelity screener CSV export."""
+    import re
+    import pandas as pd
+    from io import StringIO
+
+    try:
+        content = file_obj.read()
+        text = content.decode("utf-8-sig", errors="replace") if isinstance(content, bytes) else str(content)
+        symbols: set[str] = set()
+        # Fidelity exports vary; first inspect any explicit symbol-like column.
+        lines = text.splitlines()
+        for start, line in enumerate(lines):
+            if any(label in line.lower() for label in ("symbol", "ticker", "name")):
+                try:
+                    frame = pd.read_csv(StringIO("\n".join(lines[start:])))
+                    for column in frame.columns:
+                        if str(column).strip().lower() in {"symbol", "ticker", "fund symbol"}:
+                            for value in frame[column].dropna():
+                                candidate = str(value).strip().upper()
+                                if re.fullmatch(r"[A-Z][A-Z0-9.-]{0,9}", candidate):
+                                    symbols.add(candidate)
+                    break
+                except Exception:
+                    continue
+        # Also support names formatted as "Fund Name (FXAIX)".
+        symbols.update(re.findall(r"\(([A-Z][A-Z0-9.-]{1,9})\)", text.upper()))
+        return sorted(symbols)
+    except Exception:
+        return []
+
 def get_sector_etf(sector: str) -> str:
     """Return the SPDR Sector ETF ticker for a given sector name."""
     mapping = {
@@ -524,4 +603,3 @@ def get_sector_etf(sector: str) -> str:
         "Basic Materials": "XLB"
     }
     return mapping.get(sector, "SPY")  # Fallback to SPY
-

@@ -11,6 +11,7 @@ from typing import Any
 
 import streamlit as st
 import numpy as np
+import pandas as pd
 
 from config import COLORS, SCORE_THRESHOLDS
 
@@ -231,12 +232,17 @@ def render_top5_upside_cards(df) -> None:
     df : pd.DataFrame
         Columns: ticker, last_price, bayesian_posterior, bull_pct_90, quality_score, reason.
     """
-    st.subheader("Top 5 Highest Upside (Bayesian Conviction)")
-    st.markdown("<small style='color:#8892a0;'>Sorted by mathematically modeled 90-day upside and Bayesian probability. *Not a guarantee of future returns.*</small>", unsafe_allow_html=True)
+    title = "Top 5 Risk-Adjusted Research Rankings" if "risk_adjusted_conviction" in df.columns else "Top 5 Highest Upside (Bayesian Conviction)"
+    st.subheader(title)
+    st.markdown("<small style='color:#8892a0;'>Combines model evidence for ranking only; it is not a calibrated probability or guarantee of future returns.</small>", unsafe_allow_html=True)
     cols = st.columns(5)
     
-    # Sort by bull_pct_90 and bayesian_posterior
-    sorted_df = df.sort_values(by=["bull_pct_90", "bayesian_posterior"], ascending=[False, False])
+    if "risk_adjusted_conviction" in df.columns:
+        sorted_df = df.sort_values(
+            by=["risk_adjusted_conviction", "bull_pct_90"], ascending=[False, False]
+        )
+    else:
+        sorted_df = df.sort_values(by=["bull_pct_90", "bayesian_posterior"], ascending=[False, False])
     rows = sorted_df.head(5).to_dict("records")
 
     for idx, (col, row) in enumerate(zip(cols, rows)):
@@ -245,6 +251,7 @@ def render_top5_upside_cards(df) -> None:
         bayesian = row.get("bayesian_posterior", 0.0)
         upside = row.get("bull_pct_90", 0.0)
         quality = row.get("quality_score", 0)
+        adjusted = row.get("risk_adjusted_conviction")
         
         bayesian_cls = _score_badge_class(bayesian * 100)
 
@@ -262,6 +269,7 @@ def render_top5_upside_cards(df) -> None:
             <div class="text-secondary" style="font-size:0.72rem; margin-top:0.3rem;">
                 Quality Score: {quality:.0f}%
             </div>
+            {f'<div class="text-secondary" style="font-size:0.72rem;">Research rank: {adjusted:.0f}</div>' if adjusted is not None else ''}
         </div>
         """
         with col:
@@ -472,12 +480,74 @@ def render_risk_warnings(warnings: list[str]) -> None:
     _render_html("\n".join(html_parts))
 
 
+def render_risk_analysis(risk: dict) -> None:
+    """Render the key historical downside metrics and sizing guideline."""
+    if not risk or not risk.get("available"):
+        st.caption("Historical risk metrics are unavailable for this scan.")
+        return
+
+    def pct(key: str) -> str:
+        return f"{risk.get(key, 0.0):.1%}"
+
+    st.markdown("##### Historical Risk Analysis")
+    c1, c2 = st.columns(2)
+    c1.metric("Volatility", pct("annualized_volatility"))
+    c2.metric("Max Drawdown", pct("max_drawdown"))
+    c3, c4 = st.columns(2)
+    c3.metric("Daily 95% Expected Shortfall", pct("expected_shortfall_95_daily"))
+    c4.metric("Beta", f"{risk.get('beta', 1.0):.2f}")
+    c5, c6 = st.columns(2)
+    c5.metric("Sharpe", f"{risk.get('sharpe_ratio', 0.0):.2f}")
+    c6.metric("Sortino", f"{risk.get('sortino_ratio', 0.0):.2f}")
+
+    sizing = risk.get("position_sizing", {})
+    st.caption(
+        f"Risk level: {risk.get('risk_level', 'Unknown')} | "
+        f"Suggested max weight: {sizing.get('max_portfolio_weight', 0.0):.1%} | "
+        f"Sizing buffer: {sizing.get('volatility_buffer_pct', 0.0):.1%} | "
+        f"Lookback: {risk.get('observations', 0)} sessions"
+    )
+
+
+def render_llm_review(review: dict) -> None:
+    """Render a structured multi-agent research review."""
+    if not review.get("available"):
+        st.warning(review.get("error", "LLM review is unavailable."))
+        return
+    final = review.get("final", {})
+    st.markdown("##### Multi-Agent Critical Review")
+    st.caption(f"Model: {review.get('model', 'N/A')} | LLM synthesis does not replace numerical forecasts.")
+    c1, c2 = st.columns(2)
+    c1.metric("Review stance", final.get("stance", "Insufficient evidence"))
+    c2.metric("Review confidence", f"{final.get('confidence', 0)}%")
+    st.markdown(f"**Thesis:** {final.get('thesis', 'N/A')}")
+    st.markdown(f"**Bull case:** {final.get('bull_case', 'N/A')}")
+    st.markdown(f"**Bear case:** {final.get('bear_case', 'N/A')}")
+    st.markdown(f"**Forecast interpretation:** {final.get('forecast_interpretation', 'N/A')}")
+    if final.get("disagreements"):
+        st.markdown("**Agent disagreements:** " + "; ".join(final["disagreements"]))
+    if final.get("invalidation_conditions"):
+        st.markdown("**Invalidation conditions:** " + "; ".join(final["invalidation_conditions"]))
+    st.caption(final.get("disclaimer", "Research summary only; not investment advice."))
+
+
 # ------------------------------------------------------------------
 # 8. Causal & Fundamental Display
 # ------------------------------------------------------------------
 
 def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
     """Render the 18 criteria Pass/Fail fundamental screen table."""
+    if screen_results.get("asset_type") in {"mutual_fund", "etf"}:
+        st.markdown(f"### Fund Quality Score: {screen_results.get('quality_score', 0):.0f}%")
+        c1, c2 = st.columns(2)
+        expense = screen_results.get("expense_ratio")
+        c1.metric("Net expense ratio", f"{expense:.2%}" if isinstance(expense, (int, float)) else "N/A")
+        c2.metric("Fund family", screen_results.get("fund_family") or "N/A")
+        st.caption(screen_results.get("note", "Fund-specific quality analysis."))
+        criteria = screen_results.get("criteria", [])
+        if criteria:
+            st.dataframe(pd.DataFrame(criteria), use_container_width=True, hide_index=True)
+        return
     quality_score = screen_results.get("quality_score", 0)
     score_cls = _score_badge_class(quality_score)
     
@@ -525,8 +595,6 @@ def render_fundamental_screen_table(screen_results: dict[str, Any]) -> None:
             </tr>
             """
         )
-    
-    import pandas as pd # Ensure pandas is available for pd.isna
     
     rows = [
         row("Liquidity & Size", "Market Cap > $2B", "market_cap", "market_cap_pass", "${:,.0f}"),

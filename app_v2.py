@@ -5,6 +5,7 @@ import numpy as np
 # Internal modules
 from data import db
 from ui import components, styles, charts
+from llm.multi_agent_review import is_available as llm_review_available, review_stock_sync
 
 # -------------------------------------------------------------
 # App Configuration & SEO Best Practices
@@ -185,6 +186,8 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
             heatmap_df = heatmap_df.rename(columns={'market_cap': 'marketCap'})
         heatmap_fig = charts.create_sector_heatmap(heatmap_df)
         st.plotly_chart(heatmap_fig, use_container_width=True)
+        risk_fig = charts.create_risk_return_chart(heatmap_df)
+        st.plotly_chart(risk_fig, use_container_width=True)
         
     st.markdown("---")
     
@@ -228,9 +231,9 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
             with col2:
                 st.metric("Last Price", f"${price_features.get('close', 0):,.2f}")
             with col3:
-                mcap = fundamentals.get('marketCap')
+                mcap = fundamentals.get('marketCap') or fundamentals.get('totalAssets')
                 mcap_str = f"${mcap/1e9:,.2f} B" if mcap and mcap >= 1e9 else f"${mcap/1e6:,.2f} M" if mcap else "N/A"
-                st.metric("Market Cap", mcap_str)
+                st.metric("Net Assets" if details.get("asset_type") in {"mutual_fund", "etf"} else "Market Cap", mcap_str)
                 
             st.markdown(" ")
             
@@ -268,6 +271,7 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                     
                     st.markdown("##### Warnings & Risks")
                     components.render_risk_warnings(scores.get("warnings", []))
+                    components.render_risk_analysis(scores.get("risk_analysis", {}))
                     
                 st.markdown("---")
                 
@@ -310,6 +314,15 @@ if st.session_state.db_loaded and not st.session_state.scan_df.empty:
                     )
                 with fund_col:
                     components.render_fundamental_screen_table(details.get("fundamental_results", {}))
+
+                st.markdown("---")
+                if st.button("Run Multi-Agent Critical Review", key=f"llm_review_{selected_ticker}"):
+                    with st.spinner("Independent LLM specialists are reviewing the evidence..."):
+                        st.session_state.setdefault("llm_reviews", {})[selected_ticker] = review_stock_sync(selected_ticker, details)
+                if not llm_review_available():
+                    st.caption("Set OPENAI_API_KEY to enable the optional LLM review layer.")
+                if selected_ticker in st.session_state.get("llm_reviews", {}):
+                    components.render_llm_review(st.session_state.llm_reviews[selected_ticker])
 
             with tab3:
                 raw_col1, raw_col2 = st.columns(2)

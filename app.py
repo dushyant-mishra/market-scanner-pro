@@ -14,14 +14,17 @@ import scoring.stock_scorer as stock_scorer
 import scoring.options_scorer as options_scorer
 import scoring.forecaster as forecaster
 import scoring.fundamental_screener as fundamental_screener
+import scoring.fund_analysis as fund_analysis
 import scoring.causal_model as causal_model
 import scoring.bayesian_inference as bayesian_inference
 import indicators.pattern_recognition as pattern_recognition
 import scoring.sentiment as sentiment
+from scoring.risk_analysis import risk_adjusted_conviction
 from backtest.engine import BacktestRunner
 import ui.styles as styles
 import ui.components as components
 import ui.charts as charts
+from llm.multi_agent_review import is_available as llm_review_available, review_stock_sync
 
 # -------------------------------------------------------------
 # App Configuration & SEO Best Practices
@@ -53,7 +56,7 @@ st.sidebar.title("Scanner Configuration")
 # Universe selector
 universe_names = st.sidebar.multiselect(
     "Select Ticker Universes",
-    options=["Default", "S&P 500", "Nasdaq 100", "Top Options", "Fidelity Portfolio", "Custom"],
+    options=["Default", "S&P 500", "Nasdaq 100", "Top Options", "Fidelity Mutual Funds", "Fidelity ETFs", "Fidelity Fund Screener Export", "Fidelity Portfolio", "Custom"],
     default=["S&P 500", "Nasdaq 100"],
     key="sb_universe"
 )
@@ -64,6 +67,8 @@ universe_key_map = {
     "S&P 500": "sp500",
     "Nasdaq 100": "nasdaq100",
     "Top Options": "top_liquid",
+    "Fidelity Mutual Funds": "fidelity_mutual_funds",
+    "Fidelity ETFs": "fidelity_etfs",
 }
 
 default_text_list = []
@@ -81,6 +86,17 @@ for name in universe_names:
                 st.sidebar.error("Could not parse any tickers from CSV. Please check the file format.")
         else:
             st.sidebar.info("Upload your downloaded Fidelity positions CSV to scan those tickers.")
+    elif name == "Fidelity Fund Screener Export":
+        fund_file = st.sidebar.file_uploader("Upload Fidelity fund screener CSV", type=["csv"], key="fidelity_fund_csv")
+        if fund_file is not None:
+            parsed_tickers = universe.parse_fidelity_fund_screener_csv(fund_file)
+            if parsed_tickers:
+                st.sidebar.success(f"Parsed {len(parsed_tickers)} funds from the screener export.")
+                default_text_list.extend(parsed_tickers)
+            else:
+                st.sidebar.error("No fund symbols were found in the screener export.")
+        else:
+            st.sidebar.info("Export current Fidelity screener results to include FundsNetwork products.")
     else:
         u_key = universe_key_map.get(name)
         if u_key:
@@ -157,6 +173,7 @@ if run_scan:
     else:
         st.session_state.scan_raw = {}
         rows = []
+        spy_hist = fetcher.get_price_history("SPY")
         
         progress = st.progress(0)
         status = st.empty()
@@ -172,10 +189,11 @@ if run_scan:
                 
                 # 2. Fetch fundamentals and option aggregates
                 fundamentals = fetcher.get_fundamentals(ticker)
-                options_data = fetcher.get_options_data(ticker)
-                earnings_date = fetcher.get_earnings_date(ticker)
+                asset_type = universe.get_asset_type(ticker, fundamentals.get("quoteType"))
+                options_data = fetcher.get_options_data(ticker) if asset_type != "mutual_fund" else {}
+                earnings_date = fetcher.get_earnings_date(ticker) if asset_type == "equity" else None
                 
-                if run_full_fundamentals:
+                if run_full_fundamentals and asset_type == "equity":
                     income_stmt, balance_sheet = fetcher.get_financials_statements(ticker)
                 else:
                     income_stmt, balance_sheet = pd.DataFrame(), pd.DataFrame()
@@ -218,12 +236,19 @@ if run_scan:
                 }
                 
                 # 4. Multi-factor Stock Scoring & Fundamentals
-                scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators, hist)
-                
-                fundamental_results = fundamental_screener.run_fundamental_screen(
-                    fundamentals, tech_indicators, price_features, income_stmt, balance_sheet
+                scores = stock_scorer.score_stock(
+                    price_features, options_data, fundamentals, tech_indicators, hist, spy_hist
                 )
                 
+                if asset_type == "equity":
+                    fundamental_results = fundamental_screener.run_fundamental_screen(
+                        fundamentals, tech_indicators, price_features, income_stmt, balance_sheet
+                    )
+                else:
+                    fundamental_results = fund_analysis.analyze_fund(
+                        fundamentals, scores.get("risk_analysis", {}), asset_type
+                    )
+
                 quality_score = fundamental_results.get("quality_score", 0)
                 if quality_score < min_quality_score:
                     continue  # Filter out tickers that fail the quality score threshold
@@ -237,7 +262,7 @@ if run_scan:
                     numeric_confidence = float(raw_conf)
                 
                 # 6. Evaluate option strategies and map keys
-                strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features)
+                strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features) if asset_type != "mutual_fund" else []
                 for s in strategies:
                     s["score"] = s.get("suitability_score", 0.0)
                 
@@ -266,16 +291,15 @@ if run_scan:
                 sector = fundamentals.get("sector") or universe.SECTOR_MAP.get(ticker, "Other")
                 
                 # 9. Causal Discovery Modeling
-                spy_hist = fetcher.get_price_history("SPY")
                 sector_etf = universe.get_sector_etf(sector)
                 sector_hist = fetcher.get_price_history(sector_etf) if sector_etf != "SPY" else pd.DataFrame()
                 
                 causal_results = causal_model.run_causal_analysis(
                     hist_with_ind, sector_hist, spy_hist, fundamental_results
-                )
+                ) if asset_type != "mutual_fund" else {"available": False, "reason": "NAV-priced mutual funds do not have meaningful intraday volume causality."}
                 
                 # 10. NLP Sentiment Analysis
-                news_texts = fetcher.get_news(ticker)
+                news_texts = fetcher.get_news(ticker) if asset_type != "mutual_fund" else []
                 sentiment_data = sentiment.calculate_news_sentiment(news_texts)
                 sentiment_score = sentiment_data.get("score", 0.0)
                 
@@ -284,14 +308,17 @@ if run_scan:
                     quality_score, causal_results, patterns, sentiment_score
                 )
                 
-                forecasts_dict = raw_forecast.get("forecasts", {})
-                bull_pct_90 = 0.0
-                if 90 in forecasts_dict:
-                    bull_pct_90 = forecasts_dict[90].get("bull_pct", 0.0)
+                bull_pct_90 = forecast_formatted.get("90", {}).get("bull_pct", 0.0)
+
+                adjusted_conviction = risk_adjusted_conviction(
+                    scores.get("bull_score", 50.0), bayesian_results["posterior_prob"],
+                    numeric_confidence, scores.get("risk_score", 50.0)
+                )
                 
                 # Cache parsed ticker details
                 st.session_state.scan_raw[ticker] = {
                     "price_features": price_features,
+                    "asset_type": asset_type,
                     "fundamentals": fundamentals,
                     "options_data": options_data,
                     "technical": tech_indicators,
@@ -324,11 +351,15 @@ if run_scan:
                     "leaps_call_put_oi_ratio": options_data.get("leaps_call_put_oi_ratio", np.nan),
                     "iv_skew_put_minus_call": options_data.get("iv_skew_put_minus_call", np.nan),
                     "reason": scores["reasons"][0] if scores.get("reasons") else "No strong signals",
-                    "marketCap": fundamentals.get("marketCap") or 1e9,
+                    "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
+                    "asset_type": asset_type,
                     "sector": sector,
                     "quality_score": quality_score,
                     "bayesian_posterior": bayesian_results["posterior_prob"],
                     "bull_pct_90": bull_pct_90,
+                    "risk_adjusted_conviction": adjusted_conviction,
+                    "annualized_volatility": scores.get("risk_analysis", {}).get("annualized_volatility", np.nan),
+                    "max_drawdown": scores.get("risk_analysis", {}).get("max_drawdown", np.nan),
                 })
                 
             except Exception as e:
@@ -430,6 +461,8 @@ else:
             heatmap_df = heatmap_df.rename(columns={'market_cap': 'marketCap'})
         heatmap_fig = charts.create_sector_heatmap(heatmap_df)
         st.plotly_chart(heatmap_fig, use_container_width=True)
+        risk_fig = charts.create_risk_return_chart(heatmap_df)
+        st.plotly_chart(risk_fig, use_container_width=True)
     
     st.markdown("---")
     df = st.session_state.scan_df
@@ -489,9 +522,9 @@ else:
         with col2:
             st.metric("Last Price", f"${details['price_features']['close']:,.2f}")
         with col3:
-            mcap = details['fundamentals'].get('marketCap')
+            mcap = details['fundamentals'].get('marketCap') or details['fundamentals'].get('totalAssets')
             mcap_str = f"${mcap/1e9:,.2f} B" if mcap and mcap >= 1e9 else f"${mcap/1e6:,.2f} M" if mcap else "N/A"
-            st.metric("Market Cap", mcap_str)
+            st.metric("Net Assets" if details.get("asset_type") in {"mutual_fund", "etf"} else "Market Cap", mcap_str)
             
         st.markdown(" ")
         
@@ -528,6 +561,7 @@ else:
                 
                 st.markdown("##### Warnings & Risks")
                 components.render_risk_warnings(details["scores"]["warnings"])
+                components.render_risk_analysis(details["scores"].get("risk_analysis", {}))
                 
             st.markdown("---")
             
@@ -566,8 +600,17 @@ else:
                     details.get("scores", {}).get("lookalike_stats", {}),
                     details.get("scores", {}).get("win_rate_stats", {})
                 )
-            with fund_col:
-                components.render_fundamental_screen_table(details.get("fundamental_results", {}))
+                with fund_col:
+                    components.render_fundamental_screen_table(details.get("fundamental_results", {}))
+
+                st.markdown("---")
+                if st.button("Run Multi-Agent Critical Review", key=f"llm_review_{selected_ticker}"):
+                    with st.spinner("Independent LLM specialists are reviewing the evidence..."):
+                        st.session_state.setdefault("llm_reviews", {})[selected_ticker] = review_stock_sync(selected_ticker, details)
+                if not llm_review_available():
+                    st.caption("Set OPENAI_API_KEY to enable the optional LLM review layer.")
+                if selected_ticker in st.session_state.get("llm_reviews", {}):
+                    components.render_llm_review(st.session_state.llm_reviews[selected_ticker])
 
         with tab3:
             raw_col1, raw_col2 = st.columns(2)

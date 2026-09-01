@@ -51,6 +51,27 @@ Click into any ticker to view a comprehensive teardown:
 *   **Probabilistic Forecasting**: 30-day and 90-day predictive targets mapping the Bear, Base, and Bull case prices.
 *   **Options Strategy Recommender**: Analyzes current Implied Volatility (IV) and Put/Call skew to rank the top 10 best options strategies (e.g., Cash-Secured Puts vs. Call Debit Spreads) using a custom Radar Chart.
 *   **Causal & Pattern Insights**: A live Evidence Log showing exactly *why* the Bayesian model likes the stock, including real-time Edwards & Magee pattern triggers.
+*   **Historical Risk Analysis**: Drawdown, volatility, daily VaR/expected shortfall, beta, liquidity, stress sensitivities, and a volatility-based sizing guideline.
+*   **Optional Multi-Agent LLM Review**: Independent technical, fundamental, options, and risk reviewers are reconciled by a critical arbiter. The agents interpret existing deterministic scenarios and cannot create new price targets.
+
+### Optional LLM Review Setup
+
+Install dependencies, set an API key in your environment, and optionally select a review model:
+
+```powershell
+pip install -r requirements.txt
+$env:OPENAI_API_KEY="your-key"
+$env:OPENAI_REVIEW_MODEL="gpt-5.6-sol"
+streamlit run app.py
+```
+
+The API key is read only from the environment and is never stored in scan data. LLM output is a qualitative research review, not a calibrated forecast or trading instruction.
+
+### Fidelity Mutual Funds and ETFs
+
+The interactive scanner includes built-in **Fidelity Mutual Funds** and **Fidelity ETFs** universes. The nightly scanner includes both automatically. Mutual funds use NAV history, fund costs, longer-term returns, drawdown, and risk-adjusted performance; inapplicable equity-only signals such as earnings, corporate statements, options flow, and intraday volume causality are skipped.
+
+For the larger third-party FundsNetwork catalog, export current results from Fidelity's mutual-fund screener and select **Fidelity Fund Screener Export** in the sidebar. Availability, transaction fees, minimums, and share classes can change, so the imported Fidelity export should be treated as the source of truth. Unverified Yahoo expense-ratio fields are deliberately excluded from quality scoring.
 
 ---
 

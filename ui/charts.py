@@ -424,6 +424,12 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     # Standardize market cap column name if needed
     if "market_cap" in df.columns and "marketCap" not in df.columns:
         df = df.rename(columns={"market_cap": "marketCap"})
+
+    defaults = {"sector": "Other", "ticker": "Unknown", "bull_score": 50.0,
+                "marketCap": 1e9, "last_price": 0.0}
+    for column, default in defaults.items():
+        if column not in df:
+            df[column] = default
         
     # Fill missing or invalid values for category columns
     df["sector"] = df["sector"].fillna("Other").astype(str).str.strip()
@@ -431,12 +437,17 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     df["ticker"] = df["ticker"].fillna("Unknown").astype(str).str.strip()
     
     # Ensure numeric columns are strictly numeric and contain no NaNs
-    df["bull_score"] = pd.to_numeric(df["bull_score"], errors="coerce").fillna(50.0)
-    df["marketCap"] = pd.to_numeric(df["marketCap"], errors="coerce").fillna(1e9)
-    df["last_price"] = pd.to_numeric(df["last_price"], errors="coerce").fillna(0.0)
+    df["bull_score"] = pd.to_numeric(df["bull_score"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(50.0).clip(0, 100)
+    df["marketCap"] = pd.to_numeric(df["marketCap"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(1e9)
+    df["last_price"] = pd.to_numeric(df["last_price"], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(0.0)
     
     # Keep only rows with positive market cap (required by Plotly treemap)
     df = df[df["marketCap"] > 0]
+    if df.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="No valid sector data available", showarrow=False)
+        fig.update_layout(**get_chart_layout())
+        return fig
     
     # Use px.treemap to automatically generate parent nodes (sectors)
     fig = px.treemap(
@@ -452,6 +463,51 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
         range_color=[0, 100],
     )
     
+    # ------------------------------------------------------------------
+    # Fix NaN color values on parent (sector / root) nodes.
+    # Plotly treemaps only assign the color column to leaf nodes;
+    # intermediate nodes default to NaN.  We replace those with the
+    # market-cap-weighted average bull_score of their children.
+    # ------------------------------------------------------------------
+    for trace in fig.data:
+        colors  = list(trace.marker.colors)
+        labels  = list(trace.labels)
+        parents = list(trace.parents)
+        values  = list(trace.values)
+
+        # Build a parent -> children index for quick lookup
+        from collections import defaultdict
+        children_map = defaultdict(list)
+        for idx, par in enumerate(parents):
+            children_map[par].append(idx)
+
+        # Bottom-up pass: resolve NaN colors as weighted avg of children
+        import math
+
+        def _resolve(i):
+            c = colors[i]
+            if c is not None and not pd.isna(c):
+                return c
+            child_indices = children_map.get(labels[i], [])
+            child_scores, child_weights = [], []
+            for ci in child_indices:
+                sc = _resolve(ci)
+                if sc is not None and not pd.isna(sc):
+                    child_scores.append(sc)
+                    child_weights.append(max(values[ci], 1))
+            if child_scores:
+                avg = sum(s * w for s, w in zip(child_scores, child_weights)) / sum(child_weights)
+                colors[i] = avg
+                return avg
+            colors[i] = 50.0          # fallback
+            return 50.0
+
+        for i in range(len(colors)):
+            _resolve(i)
+
+        trace.marker.colors = colors
+    # ------------------------------------------------------------------
+
     fig.update_traces(
         marker=dict(line=dict(width=1, color=COLORS["bg_primary"])),
         texttemplate="<b>%{label}</b><br>%{color:.0f}",
@@ -482,6 +538,48 @@ def create_sector_heatmap(df: pd.DataFrame) -> go.Figure:
     )
     fig.update_layout(**base)
 
+    return fig
+
+
+def create_risk_return_chart(df: pd.DataFrame) -> go.Figure:
+    """Bubble chart exposing conviction versus historical downside risk."""
+    import plotly.express as px
+
+    clean = df.copy()
+    required = {"ticker", "bull_score", "risk_score"}
+    if not required.issubset(clean.columns):
+        clean = pd.DataFrame(columns=["ticker", "bull_score", "risk_score", "marketCap", "sector"])
+    if "market_cap" in clean and "marketCap" not in clean:
+        clean = clean.rename(columns={"market_cap": "marketCap"})
+    for column, default in (("bull_score", 50.0), ("risk_score", 50.0), ("marketCap", 1e9)):
+        if column not in clean:
+            clean[column] = default
+        clean[column] = pd.to_numeric(clean[column], errors="coerce").replace([float("inf"), float("-inf")], pd.NA).fillna(default)
+    clean["bull_score"] = clean["bull_score"].clip(0, 100)
+    clean["risk_score"] = clean["risk_score"].clip(0, 100)
+    clean.loc[clean["marketCap"] <= 0, "marketCap"] = 1e9
+    if "sector" not in clean:
+        clean["sector"] = "Other"
+    clean["sector"] = clean["sector"].fillna("Other")
+
+    fig = px.scatter(
+        clean,
+        x="risk_score",
+        y="bull_score",
+        size="marketCap",
+        color="sector",
+        hover_name="ticker",
+        size_max=45,
+        labels={"risk_score": "Risk Score (lower is better)", "bull_score": "Bull Score"},
+        title="Risk vs. Conviction",
+    )
+    fig.add_vline(x=55, line_dash="dot", line_color=COLORS["warning"])
+    fig.add_hline(y=60, line_dash="dot", line_color=COLORS["accent"])
+    base = get_chart_layout()
+    base.update(height=430, margin=dict(l=8, r=8, t=50, b=8))
+    fig.update_layout(**base)
+    fig.update_xaxes(range=[0, 100])
+    fig.update_yaxes(range=[0, 100])
     return fig
 
 

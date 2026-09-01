@@ -28,9 +28,18 @@ def init_db(db_path=DB_PATH):
             bull_pct_90 REAL,
             quality_score REAL,
             sector TEXT,
-            market_cap REAL
+            market_cap REAL,
+            risk_adjusted_conviction REAL,
+            annualized_volatility REAL,
+            max_drawdown REAL
+            ,asset_type TEXT
         )
     ''')
+    existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(scan_summary)")}
+    for column in ("risk_adjusted_conviction", "annualized_volatility", "max_drawdown", "asset_type"):
+        if column not in existing_columns:
+            column_type = "TEXT" if column == "asset_type" else "REAL"
+            cursor.execute(f"ALTER TABLE scan_summary ADD COLUMN {column} {column_type}")
     
     # Table for the deep-dive raw data (used by the Detailed Security Report)
     cursor.execute('''
@@ -115,8 +124,9 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
         cursor.execute('''
             INSERT OR REPLACE INTO scan_summary 
             (ticker, last_updated, last_price, bull_score, risk_score, confidence, 
-             reason, bayesian_posterior, bull_pct_90, quality_score, sector, market_cap)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             reason, bayesian_posterior, bull_pct_90, quality_score, sector, market_cap,
+             risk_adjusted_conviction, annualized_volatility, max_drawdown, asset_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             ticker,
             now,
@@ -129,7 +139,11 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
             summary_dict.get("bull_pct_90", 0.0),
             summary_dict.get("quality_score", 0.0),
             summary_dict.get("sector", "Other"),
-            summary_dict.get("marketCap", 0.0)
+            summary_dict.get("marketCap", 0.0),
+            summary_dict.get("risk_adjusted_conviction", 0.0),
+            summary_dict.get("annualized_volatility"),
+            summary_dict.get("max_drawdown"),
+            summary_dict.get("asset_type", "equity")
         ))
         
         # 2. Save Raw Data
@@ -145,6 +159,7 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
     except Exception as e:
         logger.error(f"Failed to save {ticker} to DB: {e}")
         conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -152,6 +167,7 @@ def save_stock_result(ticker, summary_dict, raw_dict, db_path=DB_PATH):
 def load_all_summaries(db_path=DB_PATH):
     """Load all summary rows from the database as a DataFrame."""
     try:
+        init_db(db_path)
         conn = sqlite3.connect(db_path)
         df = pd.read_sql_query("SELECT * FROM scan_summary", conn)
         conn.close()

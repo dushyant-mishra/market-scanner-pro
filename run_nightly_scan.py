@@ -13,10 +13,15 @@ from datetime import datetime
 
 # Import internal modules
 from data import fetcher
-from data.universe import SECTOR_MAP, get_sector_etf
+from data.universe import (
+    SECTOR_MAP, FIDELITY_ETFS, FIDELITY_MUTUAL_FUNDS,
+    get_sector_etf, get_asset_type,
+)
 from data.db import init_db, save_stock_result
 from indicators import technical, pattern_recognition
 from scoring import stock_scorer, options_scorer, forecaster, causal_model, sentiment, bayesian_inference, fundamental_screener
+from scoring import fund_analysis
+from scoring.risk_analysis import risk_adjusted_conviction
 
 # Configure basic logging to terminal
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -70,7 +75,7 @@ def run_nightly_scan():
     logger.info("Initializing SQLite Database...")
     init_db()
     
-    tickers = get_russell_3000_tickers()
+    tickers = sorted(set(get_russell_3000_tickers() + FIDELITY_MUTUAL_FUNDS + FIDELITY_ETFS))
     logger.info(f"Loaded {len(tickers)} tickers for overnight scanning.")
     
     # Pre-fetch SPY for causal model
@@ -92,9 +97,10 @@ def run_nightly_scan():
             
             # 2. Fetch fundamentals and option aggregates
             fundamentals = fetcher.get_fundamentals(ticker)
-            options_data = fetcher.get_options_data(ticker)
+            asset_type = get_asset_type(ticker, fundamentals.get("quoteType"))
+            options_data = fetcher.get_options_data(ticker) if asset_type != "mutual_fund" else {}
             
-            income_stmt, balance_sheet = fetcher.get_financials_statements(ticker)
+            income_stmt, balance_sheet = fetcher.get_financials_statements(ticker) if asset_type == "equity" else (pd.DataFrame(), pd.DataFrame())
             
             # 3. Compute Technicals & Patterns
             tech_indicators = technical.calculate_all_indicators(hist)
@@ -114,16 +120,19 @@ def run_nightly_scan():
             }
             
             # 4. Multi-Factor Scoring (includes historical regime + backtest indicators)
-            scores = stock_scorer.score_stock(price_features, options_data, fundamentals, tech_indicators, hist)
+            scores = stock_scorer.score_stock(
+                price_features, options_data, fundamentals, tech_indicators, hist, spy_hist
+            )
             
-            fundamental_results = fundamental_screener.run_fundamental_screen(
-                fundamentals, tech_indicators, price_features, income_stmt, balance_sheet
+            fundamental_results = (
+                fundamental_screener.run_fundamental_screen(fundamentals, tech_indicators, price_features, income_stmt, balance_sheet)
+                if asset_type == "equity" else fund_analysis.analyze_fund(fundamentals, scores.get("risk_analysis", {}), asset_type)
             )
             quality_score = fundamental_results.get("quality_score", 0)
             
             numeric_confidence = float(scores.get("confidence", 30.0))
             
-            strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features)
+            strategies = options_scorer.rank_strategies(scores, options_data, tech_indicators, price_features) if asset_type != "mutual_fund" else []
             for s in strategies:
                 s["score"] = s.get("suitability_score", 0.0)
             
@@ -154,9 +163,9 @@ def run_nightly_scan():
             
             causal_results = causal_model.run_causal_analysis(
                 hist_with_ind, sector_hist, spy_hist, fundamental_results
-            )
+            ) if asset_type != "mutual_fund" else {"available": False, "reason": "NAV-priced mutual funds do not have meaningful intraday volume causality."}
             
-            news_texts = fetcher.get_news(ticker)
+            news_texts = fetcher.get_news(ticker) if asset_type != "mutual_fund" else []
             sentiment_data = sentiment.calculate_news_sentiment(news_texts)
             sentiment_score = sentiment_data.get("score", 0.0)
             
@@ -167,6 +176,11 @@ def run_nightly_scan():
             bull_pct_90 = 0.0
             if "90" in forecast_formatted:
                 bull_pct_90 = forecast_formatted["90"].get("bull_pct", 0.0)
+
+            adjusted_conviction = risk_adjusted_conviction(
+                scores.get("bull_score", 50.0), bayesian_results["posterior_prob"],
+                numeric_confidence, scores.get("risk_score", 50.0)
+            )
                 
             # Build Summary Dict
             summary_dict = {
@@ -176,16 +190,21 @@ def run_nightly_scan():
                 "risk_score": scores.get("risk_score", 50.0),
                 "confidence": numeric_confidence,
                 "reason": scores["reasons"][0] if scores.get("reasons") else "No strong signals",
-                "marketCap": fundamentals.get("marketCap") or 1e9,
+                "marketCap": fundamentals.get("marketCap") or fundamentals.get("totalAssets") or 1e9,
+                "asset_type": asset_type,
                 "sector": sector,
                 "quality_score": quality_score,
                 "bayesian_posterior": bayesian_results["posterior_prob"],
                 "bull_pct_90": bull_pct_90,
+                "risk_adjusted_conviction": adjusted_conviction,
+                "annualized_volatility": scores.get("risk_analysis", {}).get("annualized_volatility"),
+                "max_drawdown": scores.get("risk_analysis", {}).get("max_drawdown"),
             }
             
             # Build Raw Details Dict
             raw_dict = {
                 "price_features": price_features,
+                "asset_type": asset_type,
                 "fundamentals": fundamentals,
                 "options_data": options_data,
                 "technical": tech_indicators,

@@ -14,6 +14,7 @@ import pandas as pd
 from config import SCORING_WEIGHTS, SCORE_THRESHOLDS
 from scoring.historical_regime import find_historical_lookalikes
 from scoring.backtest_filter import get_historical_win_rate
+from scoring.risk_analysis import analyze_risk
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +364,7 @@ def score_stock(
     fundamentals: dict,
     technical: dict,
     hist: pd.DataFrame = None,
+    benchmark_hist: pd.DataFrame = None,
 ) -> Dict[str, object]:
     """Compute weighted bull / bear / risk scores with explanations.
 
@@ -436,8 +438,12 @@ def score_stock(
         # Bear score: inverse of bullish signals
         bear_score = _clamp(100.0 - bull_score)
 
-        # Risk score: high when signals are mixed or extreme
-        risk_score = _compute_risk_score(category_scores, technical, price_features)
+        risk_analysis = analyze_risk(hist, fundamentals, benchmark_hist)
+        heuristic_risk = _compute_risk_score(category_scores, technical, price_features)
+        risk_score = (
+            0.80 * risk_analysis.get("risk_score", heuristic_risk) + 0.20 * heuristic_risk
+            if risk_analysis.get("available") else heuristic_risk
+        )
 
         # Confidence
         confidence = _compute_confidence(price_features, options_data, fundamentals, technical)
@@ -445,6 +451,7 @@ def score_stock(
         # Reasons & warnings
         reasons = _generate_reasons(category_scores, technical, price_features, options_data)
         warnings = _generate_warnings(category_scores, technical, price_features, options_data, risk_score)
+        warnings.extend(risk_analysis.get("warnings", []))
 
         return {
             "bull_score": round(bull_score, 1),
@@ -456,6 +463,7 @@ def score_stock(
             "warnings": warnings[:5],
             "lookalike_stats": lookalike_stats,
             "win_rate_stats": win_rate_stats,
+            "risk_analysis": risk_analysis,
         }
 
     except Exception:
@@ -467,6 +475,12 @@ def score_stock(
             "confidence": "low",
             "category_scores": {k: 50.0 for k in SCORING_WEIGHTS},
             "reasons": [],
+            "risk_analysis": {
+                "available": False,
+                "risk_score": 50.0,
+                "risk_level": "Unknown",
+                "warnings": ["Risk analysis unavailable because scoring failed."],
+            },
             "warnings": ["Scoring encountered an error — results are defaults"],
         }
 
